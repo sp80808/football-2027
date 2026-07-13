@@ -36,6 +36,28 @@ describe('SimulationMath', () => {
     expect(velocity).toBeCloseTo(0, 5);
   });
 
+  it('produces equivalent critical damping across render schedules', () => {
+    const simulate = (steps: number, dt: number) => {
+      let value = -4;
+      let velocity = 2.5;
+      for (let i = 0; i < steps; i += 1) {
+        const next = criticallyDampedStep(value, velocity, 12, 5.8, dt);
+        value = next.value;
+        velocity = next.velocity;
+      }
+      return { value, velocity };
+    };
+
+    const at30Hz = simulate(30, 1 / 30);
+    const at60Hz = simulate(60, 1 / 60);
+    const at120Hz = simulate(120, 1 / 120);
+
+    expect(at30Hz.value).toBeCloseTo(at120Hz.value, 11);
+    expect(at60Hz.value).toBeCloseTo(at120Hz.value, 11);
+    expect(at30Hz.velocity).toBeCloseTo(at120Hz.velocity, 11);
+    expect(at60Hz.velocity).toBeCloseTo(at120Hz.velocity, 11);
+  });
+
   it('solves a stationary-target interception', () => {
     const solution = solveConstantVelocityIntercept(
       new Vec2(0, 0),
