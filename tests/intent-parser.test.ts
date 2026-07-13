@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { IntentParser } from '../src/engine/IntentParser';
+import {
+  parseIntent,
+  resolvePassModifier,
+  resolveShotModifier,
+  type ParseContext,
+} from '../src/engine/PlayerIntentParser';
 import { Vec2 } from '../src/engine/Math';
 import type { ControllerFrame } from '../src/engine/Intent';
+import { SimulationConfig } from '../src/engine/SimulationConfig';
 
 function frame(overrides: Partial<ControllerFrame> = {}): ControllerFrame {
   return {
@@ -32,10 +38,26 @@ function frame(overrides: Partial<ControllerFrame> = {}): ControllerFrame {
   };
 }
 
-describe('IntentParser', () => {
+function context(overrides: Partial<ParseContext> = {}): ParseContext {
+  return {
+    playerSpeed: 0,
+    chargeDuration: 0,
+    isCharging: false,
+    chargeType: 'pass',
+    ballGrounded: true,
+    ballInControl: false,
+    ballReceiving: false,
+    incomingBallSpeed: 0,
+    ...overrides,
+  };
+}
+
+describe('canonical player intent parser', () => {
   it('normalises movement and derives facing from movement', () => {
-    const parser = new IntentParser();
-    const intent = parser.parse(frame({ leftStick: new Vec2(2, 0) }), 1 / 120);
+    const intent = parseIntent(
+      frame({ leftStick: new Vec2(2, 0) }),
+      context({ playerSpeed: 3 }),
+    );
 
     expect(intent.moveDir.x).toBeCloseTo(1);
     expect(intent.moveDir.y).toBeCloseTo(0);
@@ -44,10 +66,9 @@ describe('IntentParser', () => {
   });
 
   it('uses right stick as independent facing intent', () => {
-    const parser = new IntentParser();
-    const intent = parser.parse(
+    const intent = parseIntent(
       frame({ leftStick: new Vec2(0, 1), rightStick: new Vec2(1, 0) }),
-      1 / 120,
+      context({ playerSpeed: 3 }),
     );
 
     expect(intent.moveDir.y).toBeCloseTo(1);
@@ -55,35 +76,55 @@ describe('IntentParser', () => {
     expect(intent.faceDir.y).toBeCloseTo(0);
   });
 
-  it('accumulates deterministic pass charge and emits on release', () => {
-    const parser = new IntentParser({ fullChargeSeconds: 0.5 });
-
-    for (let i = 0; i < 30; i += 1) {
-      parser.parse(frame({ passHeld: true }), 1 / 120);
-    }
-
-    const intent = parser.parse(frame({ passReleased: true }), 1 / 120);
-    expect(intent.action).toBe('short_pass');
-    expect(intent.charge).toBeCloseTo(0.5, 2);
-  });
-
-  it('maps combined through and lob input to a lofted through intent', () => {
-    const parser = new IntentParser();
-    parser.parse(frame({ throughPassHeld: true, lobHeld: true }), 0.1);
-    const intent = parser.parse(
-      frame({ throughPassReleased: true, lobHeld: true }),
-      0.1,
+  it('clamps deterministic charge to the valid range', () => {
+    const intent = parseIntent(
+      frame({ passReleased: true }),
+      context({
+        chargeDuration: SimulationConfig.MAX_CHARGE_TIME * 3,
+        isCharging: true,
+        chargeType: 'pass',
+      }),
     );
 
+    expect(intent.action).toBe('short_pass');
+    expect(intent.charge).toBe(1);
+  });
+
+  it('maps a lobbed through release correctly', () => {
+    const input = frame({
+      throughPassReleased: true,
+      lobHeld: true,
+    });
+    const intent = parseIntent(
+      input,
+      context({ isCharging: true, chargeType: 'pass', chargeDuration: 0.2 }),
+    );
+
+    expect(resolvePassModifier(input)).toBe('lob_through');
     expect(intent.action).toBe('lob_pass');
     expect(intent.passModifier).toBe('lob_through');
   });
 
+  it('emits a first-time action while receiving', () => {
+    const intent = parseIntent(
+      frame({ shootReleased: true }),
+      context({
+        ballReceiving: true,
+        incomingBallSpeed: 12,
+        isCharging: true,
+        chargeType: 'shoot',
+        chargeDuration: 0.25,
+      }),
+    );
+
+    expect(intent.action).toBe('first_time');
+    expect(intent.desiredTouch).toBe('cushion');
+  });
+
   it('prioritises shielding and requests cancellation while charging', () => {
-    const parser = new IntentParser();
-    const intent = parser.parse(
+    const intent = parseIntent(
       frame({ passHeld: true, shield: 1, leftStick: new Vec2(0, 1) }),
-      1 / 120,
+      context({ ballInControl: true }),
     );
 
     expect(intent.isShielding).toBe(true);
@@ -91,13 +132,20 @@ describe('IntentParser', () => {
     expect(intent.cancelRequested).toBe(true);
   });
 
-  it('derives knock-on touch from sprinting directional intent', () => {
-    const parser = new IntentParser();
-    const intent = parser.parse(
+  it('derives knock-on touch at high sprint speed', () => {
+    const intent = parseIntent(
       frame({ leftStick: new Vec2(0, 1), sprint: 1 }),
-      1 / 120,
+      context({ playerSpeed: SimulationConfig.PLAYER_SPRINT_SPEED * 0.8 }),
     );
 
     expect(intent.desiredTouch).toBe('knock_on');
+    expect(intent.skillMove).toBe('knock_on');
+  });
+
+  it('resolves shot modifiers in deterministic priority order', () => {
+    expect(resolveShotModifier(frame({ chipHeld: true, finesseHeld: true }), 1)).toBe('chip');
+    expect(resolveShotModifier(frame({ finesseHeld: true }), 1)).toBe('finesse');
+    expect(resolveShotModifier(frame({ lowDrivenTap: true }), 0.5)).toBe('low_driven');
+    expect(resolveShotModifier(frame(), 1)).toBe('power');
   });
 });
