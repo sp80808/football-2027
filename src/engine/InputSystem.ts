@@ -192,8 +192,8 @@ export class InputSystem {
     }
 
     const touch = this.touchOverrides;
-    if (touch.leftStick) leftStick.copy(touch.leftStick);
-    if (touch.rightStick) rightStick.copy(touch.rightStick);
+    if (touch.leftStick && touch.leftStick.magSq() > 0) leftStick.copy(touch.leftStick);
+    if (touch.rightStick && touch.rightStick.magSq() > 0) rightStick.copy(touch.rightStick);
     if (touch.sprint !== undefined) sprint = touch.sprint;
     if (touch.shield !== undefined) shield = touch.shield;
     if (touch.passHeld) pass = true;
