@@ -1,9 +1,17 @@
 import { create } from 'zustand';
-import { MatchPhase, MatchState } from '../engine/MatchManager';
+import { MatchPhase, MatchSnapshot } from '../engine/MatchManager';
+import { audioManager } from '../audio/AudioManager';
 
-interface GameStore extends MatchState {
+interface GameStore {
+  homeScore: number;
+  awayScore: number;
+  matchTime: number;
+  half: number;
+  phase: MatchPhase;
+  announcement: string | null;
+  goalScorer: 'home' | 'away' | null;
   audioEnabled: boolean;
-  syncMatch: (state: MatchState) => void;
+  syncMatch: (state: MatchSnapshot) => void;
   setAnnouncement: (text: string | null) => void;
   toggleAudio: () => void;
 }
@@ -13,7 +21,7 @@ export const useGameStore = create<GameStore>((set) => ({
   awayScore: 0,
   matchTime: 0,
   half: 1,
-  phase: 'pre_kickoff' as MatchPhase,
+  phase: 'pre_kickoff',
   announcement: null,
   goalScorer: null,
   audioEnabled: true,
@@ -31,5 +39,10 @@ export const useGameStore = create<GameStore>((set) => ({
 
   setAnnouncement: (text) => set({ announcement: text }),
 
-  toggleAudio: () => set((s) => ({ audioEnabled: !s.audioEnabled })),
+  toggleAudio: () =>
+    set((s) => {
+      const audioEnabled = !s.audioEnabled;
+      audioManager.setEnabled(audioEnabled);
+      return { audioEnabled };
+    }),
 }));

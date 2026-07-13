@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import WebGPURenderer from 'three/src/renderers/webgpu/WebGPURenderer.js';
+import { WebGPURenderer } from 'three/webgpu';
 
 export class RendererFactory {
   static async createRenderer(canvas: HTMLCanvasElement): Promise<any> {
@@ -16,7 +16,7 @@ export class RendererFactory {
     } catch (e) {
       console.warn("WebGPU initialization failed, falling back to WebGL2", e);
     }
-    
+
     // Fallback to WebGL
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     return renderer;

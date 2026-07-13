@@ -10,14 +10,17 @@ import {
   RefreshCw,
   Activity,
   Cpu,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { GameEngine } from '../engine/GameEngine';
 import { SimulationConfig } from '../engine/SimulationConfig';
+import { useGameStore } from '../store/gameStore';
 
 interface HUDProps {
   engine: GameEngine;
-  useWasm: boolean;
-  onToggleWasm: () => void;
+  useWasm?: boolean;
+  onToggleWasm?: () => void;
 }
 
 function Key({ children }: { children: React.ReactNode }) {
@@ -49,7 +52,14 @@ function StatRow({ label, value, accent = 'text-white' }: { label: string; value
   );
 }
 
-export function HUD({ engine, useWasm, onToggleWasm }: HUDProps) {
+function formatMatchTime(seconds: number) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+export function HUD({ engine, useWasm = false, onToggleWasm }: HUDProps) {
+  const { audioEnabled, toggleAudio } = useGameStore();
   const [diagnostics, setDiagnostics] = useState({
     tps: 0,
     fps: 0,
@@ -62,6 +72,8 @@ export function HUD({ engine, useWasm, onToggleWasm }: HUDProps) {
     chargePercent: 0,
     scorePlayer: 0,
     scoreOpponent: 0,
+    matchSeconds: 0,
+    celebrating: false,
   });
 
   useEffect(() => {
@@ -96,6 +108,8 @@ export function HUD({ engine, useWasm, onToggleWasm }: HUDProps) {
         chargePercent: Math.min(100, Math.round((state.player.chargeStart / SimulationConfig.MAX_CHARGE_TIME) * 100)),
         scorePlayer: state.scorePlayer,
         scoreOpponent: state.scoreOpponent,
+        matchSeconds: engine.elapsedSeconds,
+        celebrating: engine.isGoalCelebration,
       });
     }, 80);
 
@@ -140,16 +154,30 @@ export function HUD({ engine, useWasm, onToggleWasm }: HUDProps) {
       </div>
 
       <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 select-none">
-        <div className="flex items-center gap-4 rounded-xl border border-white/10 bg-black/60 px-5 py-2 backdrop-blur-sm">
-          <div className="flex min-w-[48px] flex-col items-center">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">You</span>
-            <span className="mt-0.5 text-2xl font-black leading-none text-blue-300">{diagnostics.scorePlayer}</span>
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex items-center gap-4 rounded-xl border border-white/10 bg-black/60 px-5 py-2 backdrop-blur-sm">
+            <div className="flex min-w-[48px] flex-col items-center">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">You</span>
+              <span className="mt-0.5 text-2xl font-black leading-none text-blue-300">{diagnostics.scorePlayer}</span>
+            </div>
+            <div className="flex flex-col items-center px-1">
+              <span className="font-mono text-sm font-semibold tabular-nums text-white/70">
+                {formatMatchTime(diagnostics.matchSeconds)}
+              </span>
+              <span className="text-[9px] uppercase tracking-widest text-white/30">
+                / {formatMatchTime(SimulationConfig.MATCH_DURATION_SECONDS)}
+              </span>
+            </div>
+            <div className="flex min-w-[48px] flex-col items-center">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">CPU</span>
+              <span className="mt-0.5 text-2xl font-black leading-none text-red-300">{diagnostics.scoreOpponent}</span>
+            </div>
           </div>
-          <span className="text-lg font-light text-white/20">—</span>
-          <div className="flex min-w-[48px] flex-col items-center">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">CPU</span>
-            <span className="mt-0.5 text-2xl font-black leading-none text-red-300">{diagnostics.scoreOpponent}</span>
-          </div>
+          {diagnostics.celebrating && (
+            <span className="rounded-full border border-amber-500/30 bg-amber-500/20 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">
+              Goal — kick-off soon
+            </span>
+          )}
         </div>
       </div>
 
@@ -198,14 +226,23 @@ export function HUD({ engine, useWasm, onToggleWasm }: HUDProps) {
         </div>
       </div>
 
-      <div className="pointer-events-auto absolute left-4 top-4 select-none">
+      <div className="pointer-events-auto absolute left-4 top-4 z-10 flex flex-col gap-2 select-none">
+        {onToggleWasm && (
+          <button
+            onClick={onToggleWasm}
+            className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/60 px-3 py-1.5 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/10"
+          >
+            <Cpu size={12} />
+            <span>Sim: <span className={useWasm ? 'text-amber-300' : 'text-blue-300'}>{useWasm ? 'WASM' : 'TypeScript'}</span></span>
+            <RefreshCw size={11} className="text-white/40" />
+          </button>
+        )}
         <button
-          onClick={onToggleWasm}
+          onClick={toggleAudio}
           className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/60 px-3 py-1.5 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/10"
         >
-          <Cpu size={12} />
-          <span>Sim: <span className={useWasm ? 'text-amber-300' : 'text-blue-300'}>{useWasm ? 'WASM' : 'TypeScript'}</span></span>
-          <RefreshCw size={11} className="text-white/40" />
+          {audioEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
+          <span>{audioEnabled ? 'Sound On' : 'Sound Off'}</span>
         </button>
       </div>
     </>

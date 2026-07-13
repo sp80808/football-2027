@@ -10,6 +10,7 @@ import { GameEngine } from './engine/GameEngine';
 import { SimulationWorkerClient } from './bridge/SimulationWorkerClient';
 import { HUD } from './components/HUD';
 import { WorldState } from './engine/WorldState';
+import { audioManager } from './audio/AudioManager';
 
 const tsEngine = new GameEngine();
 tsEngine.init();
@@ -27,11 +28,31 @@ export default function App() {
   const replayItems = useRef<WorldState[]>([]);
 
   useEffect(() => {
+    const unlock = () => {
+      audioManager.unlock();
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  useEffect(() => {
     let requestId = 0;
     const loop = (time: number) => {
       requestId = requestAnimationFrame(loop);
       if (!replayModeRef.current) {
         tsEngine.update(time);
+        for (const event of tsEngine.drainEvents()) {
+          if (event.type === 'kick') audioManager.playKick(event.power);
+          else if (event.type === 'bounce') audioManager.playBounce(event.intensity);
+          else if (event.type === 'goal') audioManager.playGoal();
+          else if (event.type === 'whistle') audioManager.playWhistle();
+        }
       }
       wasmClient.submitInput(tsEngine.input.currentFrame);
       if (Math.random() < 0.1) setForceRender({});
