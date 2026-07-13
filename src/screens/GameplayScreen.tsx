@@ -55,10 +55,7 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
       requestId = requestAnimationFrame(loop);
       if (!replayModeRef.current) {
         tsEngine.update(time);
-        useGameStore.getState().syncFromEngine(
-          { player: tsEngine.scorePlayer, opponent: tsEngine.scoreOpponent },
-          tsEngine.elapsedSeconds,
-        );
+        useGameStore.getState().syncMatch(tsEngine.getMatchSnapshot());
         for (const event of tsEngine.drainEvents()) {
           const state = tsEngine.getRenderState();
           const ballX = state.ball.pos.x;

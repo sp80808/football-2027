@@ -54,7 +54,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       homeScore: state.homeScore,
       awayScore: state.awayScore,
-      matchTime: state.matchTime,
+      matchTime: displayMatchMinute(state.matchTime),
+      elapsedSeconds: state.matchTime,
       half: state.half,
       phase: state.phase,
       announcement: state.announcement,

@@ -105,7 +105,7 @@ function PlayEventFeed({ side, align }: { side: 'home' | 'away'; align: 'left' |
 }
 
 export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = false, onToggleOffsideLine }: HUDProps) {
-  const { audioEnabled, toggleAudio, homeScore, awayScore, elapsedSeconds } = useGameStore();
+  const { audioEnabled, toggleAudio, homeScore, awayScore, elapsedSeconds, phase, announcement, half } = useGameStore();
   const { showControlHints, setSettingsOpen, activeModifierLabel, flashModifierLabel } = useSettingsStore();
   const [diagnostics, setDiagnostics] = useState({
     tps: 0,
@@ -171,6 +171,15 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
       cancelAnimationFrame(animationFrame);
     };
   }, [engine, flashModifierLabel]);
+
+  const periodLabel =
+    phase === 'halftime'
+      ? 'HALF TIME'
+      : phase === 'full_time'
+        ? 'FULL TIME'
+        : phase === 'kickoff' && half === 2
+          ? '2ND HALF'
+          : getPeriodLabel(elapsedSeconds);
 
   useEffect(() => {
     if (!diagnostics.charging) return;
@@ -250,7 +259,7 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
                 {formatBroadcastClock(elapsedSeconds)}
               </span>
               <span className="text-[8px] font-semibold uppercase tracking-[0.2em] text-white/40">
-                {getPeriodLabel(elapsedSeconds)}
+                {periodLabel}
               </span>
             </div>
             <span className="text-white/25">|</span>
@@ -258,7 +267,12 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
               {awayScore}
             </span>
           </div>
-          {diagnostics.celebrating && (
+          {announcement && (
+            <span className="w-fit rounded-full border border-amber-500/30 bg-amber-500/20 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">
+              {announcement}
+            </span>
+          )}
+          {diagnostics.celebrating && !announcement && (
             <span className="w-fit rounded-full border border-amber-500/30 bg-amber-500/20 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">
               Goal — kick-off soon
             </span>

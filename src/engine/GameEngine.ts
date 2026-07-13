@@ -10,6 +10,7 @@ import { SeededRandom } from './SeededRandom';
 import { RingBuffer } from './RingBuffer';
 import { OffsideDetector } from './OffsideDetector';
 import { ReplayRecorder } from './ReplayRecorder';
+import { MatchManager, MatchSnapshot } from './MatchManager';
 
 export type SimEvent =
   | { type: 'kick'; power: number }
@@ -27,6 +28,7 @@ export class GameEngine {
   opponent = new Opponent();
   random = new SeededRandom(12345);
   replayRecorder = new ReplayRecorder(12345);
+  matchManager = new MatchManager();
 
   private readonly dt = SimulationConfig.DT;
   private accumulator = 0;
@@ -43,10 +45,10 @@ export class GameEngine {
   public scorePlayer = 0;
   public scoreOpponent = 0;
   public lastGoalScorer: 'player' | 'opponent' | null = null;
-  private goalPauseTicks = -1;
-  private readonly goalPauseDurationTicks = SimulationConfig.SIMULATION_HZ * 3;
   private pendingEvents: SimEvent[] = [];
-  private matchElapsed = 0;
+  private prevMatchPhase = this.matchManager.state.phase;
+  private prevHomeScore = 0;
+  private prevAwayScore = 0;
 
   private readonly offsideDetector = new OffsideDetector();
   private readonly ballPlayPos = new Vec2();
@@ -62,11 +64,15 @@ export class GameEngine {
   private readonly offsideDefenders = [this.offsideDefenderA, this.offsideDefenderB];
 
   get isGoalCelebration(): boolean {
-    return this.goalPauseTicks > 0;
+    return this.matchManager.state.phase === 'goal';
   }
 
   get elapsedSeconds(): number {
-    return this.matchElapsed;
+    return this.matchManager.state.matchTime;
+  }
+
+  getMatchSnapshot(): MatchSnapshot {
+    return this.matchManager.state;
   }
 
   drainEvents(): SimEvent[] {
@@ -77,7 +83,15 @@ export class GameEngine {
 
   init() {
     this.input.init();
+    this.matchManager.init();
     this.resetPositions();
+    this.matchManager.state.phase = 'playing';
+    this.prevMatchPhase = this.matchManager.state.phase;
+    this.prevHomeScore = 0;
+    this.prevAwayScore = 0;
+    this.scorePlayer = 0;
+    this.scoreOpponent = 0;
+    this.lastGoalScorer = null;
     this.captureState(this.previousState, 0);
     this.captureState(this.currentState, 0);
     this.renderState = cloneWorldState(this.currentState);
@@ -120,18 +134,35 @@ export class GameEngine {
   }
 
   private tick() {
-    if (this.goalPauseTicks > 0) {
-      this.goalPauseTicks--;
-      if (this.goalPauseTicks === 0) {
-        this.goalPauseTicks = -1;
-        this.lastGoalScorer = null;
-        this.resetPositions();
-        this.pendingEvents.push({ type: 'whistle' });
-      }
-      return;
+    const prevPhase = this.prevMatchPhase;
+    const prevHome = this.prevHomeScore;
+    const prevAway = this.prevAwayScore;
+
+    this.matchManager.update(this.dt, this.ball, this.player, this.keeper);
+
+    const match = this.matchManager.state;
+    this.scorePlayer = match.homeScore;
+    this.scoreOpponent = match.awayScore;
+    this.lastGoalScorer =
+      match.goalScorer === 'home' ? 'player' : match.goalScorer === 'away' ? 'opponent' : null;
+
+    if (match.homeScore > prevHome) {
+      this.resetKickoffExtras();
+      this.pendingEvents.push({ type: 'goal', scorer: 'player' }, { type: 'whistle' });
+    } else if (match.awayScore > prevAway) {
+      this.resetKickoffExtras();
+      this.pendingEvents.push({ type: 'goal', scorer: 'opponent' }, { type: 'whistle' });
+    } else if (prevPhase === 'goal' && match.phase === 'kickoff') {
+      this.resetKickoffExtras();
+      this.pendingEvents.push({ type: 'whistle' });
     }
 
-    this.matchElapsed += this.dt;
+    this.prevMatchPhase = match.phase;
+    this.prevHomeScore = match.homeScore;
+    this.prevAwayScore = match.awayScore;
+
+    if (match.phase !== 'playing') return;
+
     this.input.update();
 
     const passReleased =
@@ -176,7 +207,6 @@ export class GameEngine {
     }
 
     this.previousControlState = this.player.controlState;
-    this.checkGoals();
     this.enforceBoundaries();
   }
 
@@ -224,22 +254,13 @@ export class GameEngine {
     this.pendingEvents.push({ type: 'offside', side: 'player' }, { type: 'whistle' });
   }
 
-  private checkGoals() {
-    const cfg = SimulationConfig;
-    const insideGoal = Math.abs(this.ball.pos.x) <= cfg.GOAL_HALF_WIDTH && this.ball.pos.z <= cfg.GOAL_HEIGHT;
-    if (!insideGoal) return;
-
-    if (this.ball.pos.y >= cfg.PITCH_HALF_LENGTH) {
-      this.scorePlayer++;
-      this.lastGoalScorer = 'player';
-      this.goalPauseTicks = this.goalPauseDurationTicks;
-      this.pendingEvents.push({ type: 'goal', scorer: 'player' }, { type: 'whistle' });
-    } else if (this.ball.pos.y <= -cfg.PITCH_HALF_LENGTH) {
-      this.scoreOpponent++;
-      this.lastGoalScorer = 'opponent';
-      this.goalPauseTicks = this.goalPauseDurationTicks;
-      this.pendingEvents.push({ type: 'goal', scorer: 'opponent' }, { type: 'whistle' });
-    }
+  private resetKickoffExtras() {
+    this.player.controlState = 'free';
+    this.player.isCharging = false;
+    this.player.chargeStart = 0;
+    this.awaitingOffsideCheck = false;
+    this.previousControlState = 'free';
+    this.opponent.reset();
   }
 
   private resetPositions() {

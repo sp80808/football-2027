@@ -3,7 +3,14 @@ import { Player } from './Player';
 import { Keeper } from './Keeper';
 import { SimulationConfig } from './SimulationConfig';
 
-export type MatchPhase = 'pre_kickoff' | 'playing' | 'goal' | 'kickoff' | 'celebration';
+export type MatchPhase =
+  | 'pre_kickoff'
+  | 'playing'
+  | 'goal'
+  | 'kickoff'
+  | 'celebration'
+  | 'halftime'
+  | 'full_time';
 
 export interface MatchSnapshot {
   homeScore: number;
@@ -28,6 +35,7 @@ export class MatchManager {
 
   private celebrationTimer = 0;
   private kickoffTimer = 0;
+  private halftimeTimer = 0;
 
   init() {
     this.state = {
@@ -41,9 +49,28 @@ export class MatchManager {
     };
     this.celebrationTimer = 0;
     this.kickoffTimer = 0;
+    this.halftimeTimer = 0;
+  }
+
+  beginKickoff() {
+    this.state.phase = 'kickoff';
+    this.state.announcement = 'KICK OFF';
+    this.kickoffTimer = SimulationConfig.KICKOFF_DELAY_SECONDS;
   }
 
   update(dt: number, ball: Ball, player: Player, keeper: Keeper) {
+    if (this.state.phase === 'full_time') return;
+
+    if (this.state.phase === 'halftime') {
+      this.halftimeTimer -= dt;
+      if (this.halftimeTimer <= 0) {
+        this.state.half = 2;
+        this.beginKickoff();
+        this.resetKickoffPositions(ball, player, keeper);
+      }
+      return;
+    }
+
     if (this.state.phase === 'goal') {
       this.celebrationTimer -= dt;
       if (this.celebrationTimer <= 0) {
@@ -68,7 +95,27 @@ export class MatchManager {
     if (this.state.phase !== 'playing') return;
 
     this.state.matchTime += dt;
+    this.checkPeriodTransitions(ball, player, keeper);
+    if (this.state.phase !== 'playing') return;
+
     this.checkGoal(ball, player, keeper);
+  }
+
+  private checkPeriodTransitions(ball: Ball, player: Player, keeper: Keeper) {
+    const cfg = SimulationConfig;
+    const halfDuration = cfg.MATCH_DURATION_SECONDS / 2;
+
+    if (this.state.half === 1 && this.state.matchTime >= halfDuration) {
+      this.state.phase = 'halftime';
+      this.state.announcement = 'HALF TIME';
+      this.halftimeTimer = cfg.HALFTIME_SECONDS;
+      return;
+    }
+
+    if (this.state.half === 2 && this.state.matchTime >= cfg.MATCH_DURATION_SECONDS) {
+      this.state.phase = 'full_time';
+      this.state.announcement = 'FULL TIME';
+    }
   }
 
   private checkGoal(ball: Ball, player: Player, keeper: Keeper) {
