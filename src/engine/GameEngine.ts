@@ -215,7 +215,7 @@ export class GameEngine {
       this.player.chargeType === 'shoot';
 
     this.player.update(this.dt, this.input.currentFrame, this.ball, this.opponent);
-    this.keeper.update(this.dt, this.ball);
+    this.keeper.update(this.dt, this.ball, this.input.currentFrame.keeperRushHeld);
     this.opponent.update(this.dt, this.ball, this.player);
     if (this.player.tackleWonThisTick) {
       this.pendingEvents.push({ type: 'tackle', side: 'player' });

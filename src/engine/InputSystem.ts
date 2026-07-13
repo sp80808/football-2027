@@ -115,6 +115,7 @@ export class InputSystem {
       }
       const rsMag = rightStick.mag();
       skill = rsMag > 0.85;
+      keeperRush = gamepad.buttons[10]?.pressed || false;
     } else {
       if (this.keys.ArrowUp || this.keys.KeyW) leftStick.y += 1;
       if (this.keys.ArrowDown || this.keys.KeyS) leftStick.y -= 1;
@@ -135,7 +136,7 @@ export class InputSystem {
       tackle = !!this.keys.KeyT;
       slide = !!(this.keys.KeyX || (this.keys.KeyT && (this.keys.ShiftLeft || this.keys.ShiftRight)));
       switchPlayer = !!this.keys.Tab;
-      keeperRush = false;
+      keeperRush = !!this.keys.KeyV;
 
       if (shoot && !this.prevShoot) {
         if (this.shootCharging && performance.now() - this.lastShootPressTime < 350) {
@@ -179,6 +180,7 @@ export class InputSystem {
     if (touch.skillPressed) skill = true;
     if (touch.tacklePressed) tackle = true;
     if (touch.slidePressed) slide = true;
+    if (touch.keeperRushHeld) keeperRush = true;
 
     this.currentFrame.leftStick.copy(leftStick);
     this.currentFrame.rightStick.copy(rightStick);
