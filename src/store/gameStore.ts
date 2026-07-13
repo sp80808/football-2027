@@ -26,10 +26,12 @@ interface GameStore {
   phase: MatchPhase;
   announcement: string | null;
   goalScorer: 'home' | 'away' | null;
+  periodCountdown: number | null;
   audioEnabled: boolean;
   playEvents: PlayEvent[];
   syncMatch: (state: MatchSnapshot) => void;
   syncFromEngine: (scores: { player: number; opponent: number }, elapsedSeconds: number) => void;
+  resetMatchUi: () => void;
   pushPlayEvent: (event: Omit<PlayEvent, 'id' | 'createdAt'>) => void;
   prunePlayEvents: () => void;
   setAnnouncement: (text: string | null) => void;
@@ -47,6 +49,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   phase: 'pre_kickoff',
   announcement: null,
   goalScorer: null,
+  periodCountdown: null,
   audioEnabled: true,
   playEvents: [],
 
@@ -60,6 +63,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
       phase: state.phase,
       announcement: state.announcement,
       goalScorer: state.goalScorer,
+      periodCountdown: state.periodCountdown,
+    }),
+
+  resetMatchUi: () =>
+    set({
+      homeScore: 0,
+      awayScore: 0,
+      matchTime: 0,
+      elapsedSeconds: 0,
+      half: 1,
+      phase: 'kickoff',
+      announcement: 'KICK OFF',
+      goalScorer: null,
+      periodCountdown: null,
+      playEvents: [],
     }),
 
   syncFromEngine: (scores, elapsedSeconds) =>

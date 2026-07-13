@@ -238,6 +238,7 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
             <ControlRow label="Chip" icon={<Sparkles size={12} />} keys={['Alt']} />
             <ControlRow label="Skill" icon={<Sparkles size={12} />} keys={['C']} />
             <ControlRow label="Tackle" icon={<Zap size={12} />} keys={['T']} />
+            <ControlRow label="Slide" icon={<Zap size={12} />} keys={['X', 'Shift+T']} />
           </ul>
           <p className="mt-2 text-[10px] leading-tight text-white/30">Hold to charge. Tap shoot twice for low driven.</p>
         </div>

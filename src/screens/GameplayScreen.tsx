@@ -6,6 +6,7 @@ import { GameEngine } from '../engine/GameEngine';
 import { SimulationWorkerClient } from '../bridge/SimulationWorkerClient';
 import { HUD } from '../components/HUD';
 import { TouchControls } from '../components/TouchControls';
+import { MatchPhaseOverlay } from '../components/MatchPhaseOverlay';
 import { SettingsOverlay } from '../components/SettingsOverlay';
 import { WorldState } from '../engine/WorldState';
 import { audioManager } from '../audio/AudioManager';
@@ -89,6 +90,13 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
             });
           } else if (event.type === 'whistle') {
             audioManager.playWhistle();
+          } else if (event.type === 'tackle') {
+            useGameStore.getState().pushPlayEvent({
+              side: event.side === 'player' ? 'home' : 'away',
+              kind: 'tackle',
+              matchMinute: displayMatchMinute(tsEngine.elapsedSeconds),
+              label: 'TACKLE WON',
+            });
           }
         }
         useGameStore.getState().prunePlayEvents();
@@ -139,6 +147,16 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
   const replayState = replayMode && replayItems.current.length > 0
     ? replayItems.current[replayFrame]
     : null;
+
+  const handleRematch = () => {
+    tsEngine.rematch();
+    useGameStore.getState().resetMatchUi();
+    useGameStore.getState().syncMatch(tsEngine.getMatchSnapshot());
+  };
+
+  const handleMainMenu = () => {
+    onExit();
+  };
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
@@ -244,6 +262,7 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
         showOffsideLine={showOffsideLine}
         onToggleOffsideLine={() => setShowOffsideLine((value) => !value)}
       />
+      <MatchPhaseOverlay onRematch={handleRematch} onMainMenu={handleMainMenu} />
       <TouchControls input={tsEngine.input} />
       <SettingsOverlay />
     </div>
