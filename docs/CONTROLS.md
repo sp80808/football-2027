@@ -62,4 +62,12 @@ Touch profiles: `cushion`, `push`, `shield`, `knock_on`.
 
 Touch: `TouchControls.tsx` merges via `InputSystem.applyTouchOverrides()`.
 
+## Commentary
+
+Live commentary reacts to goals, shots, tackles, and phase changes. Toggle it in the in-game **Settings** overlay; voice and volume persist. Optional `VITE_GEMINI_API_KEY` enhances goal lines.
+
+## Dev options
+
+**Match length** (Settings → Dev): **90s** for fast tests or **3 min** for a fuller half. Takes effect on the next kickoff.
+
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for input flow.

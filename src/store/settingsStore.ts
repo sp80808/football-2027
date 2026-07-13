@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import type { CommentaryVoiceId } from '../audio/commentaryTtsConfig';
 import { DEFAULT_COMMENTARY_VOICE } from '../audio/commentaryTtsConfig';
+import { setMatchDurationSeconds } from '../engine/matchDuration';
 
 export type CameraMode = 'broadcast' | 'action' | 'steady' | 'dynamic';
 export type ZoomIntensity = 'low' | 'medium' | 'high';
+export type DevMatchDuration = 90 | 180;
 
 export interface SettingsState {
   cameraMode: CameraMode;
@@ -13,6 +15,7 @@ export interface SettingsState {
   commentaryEnabled: boolean;
   commentaryVolume: number;
   commentaryVoice: CommentaryVoiceId;
+  devMatchDuration: DevMatchDuration;
   settingsOpen: boolean;
   activeModifierLabel: string | null;
   setCameraMode: (mode: CameraMode) => void;
@@ -22,6 +25,7 @@ export interface SettingsState {
   setCommentaryEnabled: (enabled: boolean) => void;
   setCommentaryVolume: (volume: number) => void;
   setCommentaryVoice: (voice: CommentaryVoiceId) => void;
+  setDevMatchDuration: (seconds: DevMatchDuration) => void;
   setSettingsOpen: (open: boolean) => void;
   setActiveModifierLabel: (label: string | null) => void;
   flashModifierLabel: (label: string) => void;
@@ -37,22 +41,32 @@ interface PersistedSettings {
   commentaryEnabled: boolean;
   commentaryVolume: number;
   commentaryVoice: CommentaryVoiceId;
+  devMatchDuration: DevMatchDuration;
 }
 
 function loadPersisted(): Partial<PersistedSettings> {
   if (typeof window === 'undefined') return {};
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) as PersistedSettings : {};
-  } catch { return {}; }
+    return raw ? (JSON.parse(raw) as PersistedSettings) : {};
+  } catch {
+    return {};
+  }
 }
 
 function persist(state: PersistedSettings) {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore quota errors
+  }
 }
 
 const saved = loadPersisted();
+const initialDevMatchDuration = saved.devMatchDuration ?? 180;
+setMatchDurationSeconds(initialDevMatchDuration);
+
 let modifierTimeout: number | undefined;
 
 function snapshot(get: () => SettingsState): PersistedSettings {
@@ -64,6 +78,7 @@ function snapshot(get: () => SettingsState): PersistedSettings {
     commentaryEnabled: get().commentaryEnabled,
     commentaryVolume: get().commentaryVolume,
     commentaryVoice: get().commentaryVoice,
+    devMatchDuration: get().devMatchDuration,
   };
 }
 
@@ -75,6 +90,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   commentaryEnabled: saved.commentaryEnabled ?? true,
   commentaryVolume: saved.commentaryVolume ?? 1,
   commentaryVoice: saved.commentaryVoice ?? DEFAULT_COMMENTARY_VOICE,
+  devMatchDuration: initialDevMatchDuration,
   settingsOpen: false,
   activeModifierLabel: null,
   setCameraMode: (cameraMode) => { set({ cameraMode }); persist(snapshot(get)); },
@@ -86,6 +102,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setCommentaryVolume: (commentaryVolume) => {
     const clamped = Math.max(0, Math.min(1, commentaryVolume));
     set({ commentaryVolume: clamped });
+    persist(snapshot(get));
+  },
+  setDevMatchDuration: (devMatchDuration) => {
+    setMatchDurationSeconds(devMatchDuration);
+    set({ devMatchDuration });
     persist(snapshot(get));
   },
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
