@@ -1,18 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { RenderingPanel } from '../debug/RenderingPanel';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
+import { Play, Pause, SkipBack, SkipForward, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Button } from '../components/ui/Button';
 import { GameEngine } from '../engine/GameEngine';
 import { SimulationWorkerClient } from '../bridge/SimulationWorkerClient';
 import { HUD } from '../components/HUD';
+import { TouchControls } from '../components/TouchControls';
+import { SettingsOverlay } from '../components/SettingsOverlay';
 import { WorldState } from '../engine/WorldState';
-import { Play, Pause, SkipBack, SkipForward, ArrowRightLeft, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Button } from '../components/ui/Button';
+import { audioManager } from '../audio/AudioManager';
+import { useGameStore } from '../store/gameStore';
+import { displayMatchMinute } from '../utils/matchTime';
 
-// Initialize the TS engine
+const RenderingPanel = React.lazy(() =>
+  import('../debug/RenderingPanel').then((m) => ({ default: m.RenderingPanel })),
+);
+
 const tsEngine = new GameEngine();
 tsEngine.init();
-
-// Initialize the WASM worker client
 const wasmClient = new SimulationWorkerClient();
 wasmClient.init();
 
@@ -26,58 +31,103 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
   const [replayMode, setReplayMode] = useState(false);
   const replayModeRef = useRef(false);
   const [replayFrame, setReplayFrame] = useState(0);
-  const [showOffsideLine, setShowOffsideLine] = useState(false);
+  const [showOffsideLine, setShowOffsideLine] = useState(true);
   const [isPlayingReplay, setIsPlayingReplay] = useState(false);
-  
   const replayItems = useRef<WorldState[]>([]);
 
   useEffect(() => {
-    let reqId: number;
+    const unlock = () => {
+      audioManager.unlock();
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
 
+  useEffect(() => {
+    let requestId = 0;
     const loop = (time: number) => {
-      reqId = requestAnimationFrame(loop);
-      
+      requestId = requestAnimationFrame(loop);
       if (!replayModeRef.current) {
         tsEngine.update(time);
-      }
-      
-      const input = tsEngine.input.currentFrame;
-      wasmClient.submitInput(input);
+        useGameStore.getState().syncFromEngine(
+          { player: tsEngine.scorePlayer, opponent: tsEngine.scoreOpponent },
+          tsEngine.elapsedSeconds,
+        );
+        for (const event of tsEngine.drainEvents()) {
+          const state = tsEngine.getRenderState();
+          const ballX = state.ball.pos.x;
+          const ballY = state.ball.pos.z + 0.11;
+          const ballZ = -state.ball.pos.y;
 
-      if (Math.random() < 0.1) {
-        setForceRender({});
+          if (event.type === 'kick') {
+            audioManager.playAt('kick', ballX, ballY, ballZ, Math.min(0.9, 0.3 + event.power * 0.4));
+          } else if (event.type === 'bounce') {
+            audioManager.playAt('bounce', ballX, ballY, ballZ, Math.min(0.5, 0.15 + event.intensity * 0.2));
+          } else if (event.type === 'goal') {
+            audioManager.playGoal();
+            useGameStore.getState().pushPlayEvent({
+              side: event.scorer === 'player' ? 'home' : 'away',
+              kind: 'goal',
+              matchMinute: displayMatchMinute(tsEngine.elapsedSeconds),
+              label: 'GOAL',
+            });
+          } else if (event.type === 'shot') {
+            useGameStore.getState().pushPlayEvent({
+              side: event.side === 'player' ? 'home' : 'away',
+              kind: 'shot',
+              matchMinute: displayMatchMinute(tsEngine.elapsedSeconds),
+              label: 'SHOT',
+            });
+          } else if (event.type === 'offside') {
+            useGameStore.getState().pushPlayEvent({
+              side: event.side === 'player' ? 'home' : 'away',
+              kind: 'offside',
+              matchMinute: displayMatchMinute(tsEngine.elapsedSeconds),
+              label: 'OFFSIDE',
+            });
+          } else if (event.type === 'whistle') {
+            audioManager.playWhistle();
+          }
+        }
+        useGameStore.getState().prunePlayEvents();
       }
+      wasmClient.submitInput(tsEngine.input.currentFrame);
+      if (Math.random() < 0.1) setForceRender({});
     };
-    reqId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(reqId);
+    requestId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(requestId);
   }, []);
 
   useEffect(() => {
     if (!replayMode || !isPlayingReplay) return;
-    
-    let reqId: number;
+    let requestId = 0;
     let lastTime = performance.now();
-    
-    const playLoop = (time: number) => {
-      reqId = requestAnimationFrame(playLoop);
-      const dt = time - lastTime;
-      if (dt > 1000 / 60) {
-        setReplayFrame(prev => {
-          if (prev >= replayItems.current.length - 1) {
+
+    const loop = (time: number) => {
+      requestId = requestAnimationFrame(loop);
+      if (time - lastTime > 1000 / 60) {
+        setReplayFrame((previous) => {
+          if (previous >= replayItems.current.length - 1) {
             setIsPlayingReplay(false);
-            return prev;
+            return previous;
           }
-          return Math.min(prev + 2, replayItems.current.length - 1);
+          return Math.min(previous + 2, replayItems.current.length - 1);
         });
         lastTime = time;
       }
     };
-    
-    reqId = requestAnimationFrame(playLoop);
-    return () => cancelAnimationFrame(reqId);
+
+    requestId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(requestId);
   }, [replayMode, isPlayingReplay]);
 
-  const handleToggleReplay = () => {
+  const toggleReplay = () => {
     if (!replayMode) {
       replayItems.current = tsEngine.replayBuffer.getItems();
       setReplayFrame(Math.max(0, replayItems.current.length - 1));
@@ -91,104 +141,99 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
     }
   };
 
-  const currentReplayState = replayMode && replayItems.current.length > 0 
-    ? replayItems.current[replayFrame] 
+  const replayState = replayMode && replayItems.current.length > 0
+    ? replayItems.current[replayFrame]
     : null;
 
   return (
-    <div className="w-screen h-screen overflow-hidden relative">
-      <RenderingPanel 
-        useWasm={useWasm} 
-        engine={tsEngine} 
-        wasmClient={wasmClient} 
-        replayState={currentReplayState}
-        showOffsideLine={replayMode && showOffsideLine}
-      />
-      
-      <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
-        <Button 
-          variant="secondary"
-          onClick={() => setUseWasm(!useWasm)}
-        >
-          <ArrowRightLeft size={16} />
-          {useWasm ? 'Using WASM Core' : 'Using TS Core'}
-        </Button>
-        <Button 
-          variant={replayMode ? 'danger' : 'primary'}
-          onClick={handleToggleReplay}
-        >
-          {replayMode ? (
-            <>Exit Replay</>
-          ) : (
-            <>
-              <Play size={16} /> Instant Replay
-            </>
-          )}
+    <div className="relative h-screen w-screen overflow-hidden">
+      <Suspense
+        fallback={
+          <div className="flex h-full w-full items-center justify-center bg-slate-950 text-sm text-slate-400">
+            Loading pitch…
+          </div>
+        }
+      >
+        <RenderingPanel
+          useWasm={useWasm}
+          engine={tsEngine}
+          wasmClient={wasmClient}
+          replayState={replayState}
+          showOffsideLine={showOffsideLine}
+        />
+      </Suspense>
+
+      <div className="absolute left-3 top-[5.5rem] z-10 flex flex-col gap-2 sm:left-4">
+        <Button variant={replayMode ? 'danger' : 'primary'} onClick={toggleReplay}>
+          {replayMode ? 'Exit Replay' : <><Play size={16} /> Instant Replay</>}
         </Button>
       </div>
 
-      <div className="absolute top-3 right-3 z-10 flex gap-2">
+      <div className="absolute right-3 top-3 z-10 sm:right-4">
         <Button variant="danger" size="sm" onClick={onExit}>
-          <X size={16} /> Exit Match
+          <X size={16} /> Exit
         </Button>
       </div>
 
       <AnimatePresence>
         {replayMode && (
-          <motion.div 
+          <motion.div
             initial={{ y: 100, opacity: 0, x: '-50%' }}
             animate={{ y: 0, opacity: 1, x: '-50%' }}
             exit={{ y: 100, opacity: 0, x: '-50%' }}
-            className="absolute bottom-10 left-1/2 z-20 bg-slate-900/90 p-6 rounded-xl text-white flex flex-col items-center gap-5 min-w-[500px] shadow-2xl border border-slate-700 backdrop-blur-sm"
+            className="absolute bottom-10 left-1/2 z-20 flex min-w-[500px] flex-col items-center gap-5 rounded-xl border border-slate-700 bg-slate-900/90 p-6 text-white shadow-2xl backdrop-blur-sm"
           >
-            <div className="flex justify-between w-full items-center">
-              <h2 className="m-0 text-red-500 text-lg font-bold flex items-center gap-2">
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+            <div className="flex w-full items-center justify-between">
+              <h2 className="m-0 flex items-center gap-2 text-lg font-bold text-red-500">
+                <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
                 REPLAY MODE
               </h2>
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-300 hover:text-white transition-colors">
-                <input 
-                  type="checkbox" 
-                  checked={showOffsideLine} 
-                  onChange={(e) => setShowOffsideLine(e.target.checked)}
-                  className="rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-900"
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300 transition-colors hover:text-white">
+                <input
+                  type="checkbox"
+                  checked={showOffsideLine}
+                  onChange={(event) => setShowOffsideLine(event.target.checked)}
+                  className="rounded border-slate-600 bg-slate-800 text-blue-500"
                 />
                 Show Offside Line
               </label>
             </div>
-            
-            <div className="w-full flex gap-4 items-center">
+
+            <div className="flex w-full items-center gap-4">
               <span className="font-mono text-sm text-slate-400">-5s</span>
-              <input 
-                type="range" 
-                min={0} 
-                max={Math.max(0, replayItems.current.length - 1)} 
-                value={replayFrame} 
-                onChange={(e) => {
-                  setReplayFrame(parseInt(e.target.value));
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0, replayItems.current.length - 1)}
+                value={replayFrame}
+                onChange={(event) => {
+                  setReplayFrame(Number.parseInt(event.target.value, 10));
                   setIsPlayingReplay(false);
                 }}
-                className="flex-1 cursor-pointer accent-blue-500 h-2 bg-slate-700 rounded-lg appearance-none"
+                className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-slate-700 accent-blue-500"
               />
               <span className="font-mono text-sm text-slate-400">NOW</span>
             </div>
-            
-            <div className="flex gap-4 items-center">
-              <button 
+
+            <div className="flex items-center gap-4">
+              <button
                 onClick={() => { setReplayFrame(0); setIsPlayingReplay(false); }}
-                className="bg-transparent border-none text-slate-300 hover:text-white cursor-pointer p-2 flex items-center justify-center transition-colors"
+                className="flex cursor-pointer items-center justify-center bg-transparent p-2 text-slate-300 transition-colors hover:text-white"
+                aria-label="Replay from start"
               >
                 <SkipBack size={24} />
               </button>
-              <button 
-                onClick={() => setIsPlayingReplay(!isPlayingReplay)}
-                className="bg-blue-500 hover:bg-blue-600 border-none text-white cursor-pointer p-3 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 shadow-lg"
+              <button
+                onClick={() => setIsPlayingReplay((playing) => !playing)}
+                className="flex cursor-pointer items-center justify-center rounded-full bg-blue-500 p-3 text-white shadow-lg transition-transform hover:scale-105 hover:bg-blue-600 active:scale-95"
+                aria-label={isPlayingReplay ? 'Pause replay' : 'Play replay'}
               >
                 {isPlayingReplay ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
               </button>
-              <button 
+              <button
                 onClick={() => { setReplayFrame(Math.max(0, replayItems.current.length - 1)); setIsPlayingReplay(false); }}
-                className="bg-transparent border-none text-slate-300 hover:text-white cursor-pointer p-2 flex items-center justify-center transition-colors"
+                className="flex cursor-pointer items-center justify-center bg-transparent p-2 text-slate-300 transition-colors hover:text-white"
+                aria-label="Jump to live"
               >
                 <SkipForward size={24} />
               </button>
@@ -197,7 +242,15 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
         )}
       </AnimatePresence>
 
-      <HUD engine={tsEngine} />
+      <HUD
+        engine={tsEngine}
+        useWasm={useWasm}
+        onToggleWasm={() => setUseWasm((value) => !value)}
+        showOffsideLine={showOffsideLine}
+        onToggleOffsideLine={() => setShowOffsideLine((value) => !value)}
+      />
+      <TouchControls input={tsEngine.input} />
+      <SettingsOverlay />
     </div>
   );
 };

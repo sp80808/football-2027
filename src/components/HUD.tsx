@@ -31,6 +31,8 @@ interface HUDProps {
   engine: GameEngine;
   useWasm?: boolean;
   onToggleWasm?: () => void;
+  showOffsideLine?: boolean;
+  onToggleOffsideLine?: () => void;
 }
 
 function Key({ children }: { children: React.ReactNode }) {
@@ -64,9 +66,11 @@ function StatRow({ label, value, accent = 'text-white' }: { label: string; value
 
 function PlayEventChip({ event, align }: { event: PlayEvent; align: 'left' | 'right' }) {
   const isHome = event.side === 'home';
-  const accent = isHome
-    ? 'border-emerald-500/35 bg-emerald-500/15 text-emerald-200'
-    : 'border-red-500/35 bg-red-500/15 text-red-200';
+  const accent = event.kind === 'offside'
+    ? 'border-amber-500/35 bg-amber-500/15 text-amber-200'
+    : isHome
+      ? 'border-emerald-500/35 bg-emerald-500/15 text-emerald-200'
+      : 'border-red-500/35 bg-red-500/15 text-red-200';
 
   return (
     <motion.div
@@ -100,7 +104,7 @@ function PlayEventFeed({ side, align }: { side: 'home' | 'away'; align: 'left' |
   );
 }
 
-export function HUD({ engine, useWasm = false, onToggleWasm }: HUDProps) {
+export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = false, onToggleOffsideLine }: HUDProps) {
   const { audioEnabled, toggleAudio, homeScore, awayScore, elapsedSeconds } = useGameStore();
   const { showControlHints, setSettingsOpen, activeModifierLabel, flashModifierLabel } = useSettingsStore();
   const [diagnostics, setDiagnostics] = useState({
@@ -119,6 +123,7 @@ export function HUD({ engine, useWasm = false, onToggleWasm }: HUDProps) {
     scoreOpponent: 0,
     matchSeconds: 0,
     celebrating: false,
+    offsideLine: null as number | null,
   });
 
   useEffect(() => {
@@ -157,6 +162,7 @@ export function HUD({ engine, useWasm = false, onToggleWasm }: HUDProps) {
         scoreOpponent: state.scoreOpponent,
         matchSeconds: engine.elapsedSeconds,
         celebrating: engine.isGoalCelebration,
+        offsideLine: state.offsideLineY,
       });
     }, 80);
 
@@ -297,6 +303,9 @@ export function HUD({ engine, useWasm = false, onToggleWasm }: HUDProps) {
             <StatRow label="TPS" value={diagnostics.tps} accent="text-blue-400" />
             <StatRow label="Player" value={`${diagnostics.playerSpeed} m/s`} />
             <StatRow label="Ball" value={`${diagnostics.ballVelocity} m/s`} />
+            {diagnostics.offsideLine !== null && (
+              <StatRow label="Offside" value={`${diagnostics.offsideLine.toFixed(1)}m`} accent="text-amber-300" />
+            )}
           </div>
           <div className="mt-2.5 flex items-center gap-2">
             <Activity size={11} className="shrink-0 text-white/30" />
@@ -338,6 +347,15 @@ export function HUD({ engine, useWasm = false, onToggleWasm }: HUDProps) {
           {audioEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
           <span>{audioEnabled ? 'Sound On' : 'Sound Off'}</span>
         </button>
+        {onToggleOffsideLine && (
+          <button
+            onClick={onToggleOffsideLine}
+            className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[11px] font-medium backdrop-blur-sm transition-colors hover:bg-white/10 ${showOffsideLine ? 'border-amber-500/30 bg-amber-500/15 text-amber-200' : 'border-white/10 bg-black/60 text-white'}`}
+          >
+            <Target size={12} />
+            <span>Offside Line</span>
+          </button>
+        )}
       </div>
     </>
   );

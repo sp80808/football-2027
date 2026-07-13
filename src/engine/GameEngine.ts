@@ -1,3 +1,4 @@
+import { Vec2 } from './Math';
 import { InputSystem } from './InputSystem';
 import { Player } from './Player';
 import { Ball } from './Ball';
@@ -7,12 +8,15 @@ import { SimulationConfig } from './SimulationConfig';
 import { WorldState, createEmptyWorldState, cloneWorldState, interpolateWorldState } from './WorldState';
 import { SeededRandom } from './SeededRandom';
 import { RingBuffer } from './RingBuffer';
+import { OffsideDetector } from './OffsideDetector';
+import { ReplayRecorder } from './ReplayRecorder';
 
 export type SimEvent =
   | { type: 'kick'; power: number }
   | { type: 'bounce'; intensity: number }
   | { type: 'goal'; scorer: 'player' | 'opponent' }
   | { type: 'shot'; side: 'player' | 'opponent' }
+  | { type: 'offside'; side: 'player' | 'opponent' }
   | { type: 'whistle' };
 
 export class GameEngine {
@@ -22,6 +26,7 @@ export class GameEngine {
   keeper = new Keeper();
   opponent = new Opponent();
   random = new SeededRandom(12345);
+  replayRecorder = new ReplayRecorder(12345);
 
   private readonly dt = SimulationConfig.DT;
   private accumulator = 0;
@@ -42,6 +47,19 @@ export class GameEngine {
   private readonly goalPauseDurationTicks = SimulationConfig.SIMULATION_HZ * 3;
   private pendingEvents: SimEvent[] = [];
   private matchElapsed = 0;
+
+  private readonly offsideDetector = new OffsideDetector();
+  private readonly ballPlayPos = new Vec2();
+  private readonly playerPosAtPlay = new Vec2();
+  private awaitingOffsideCheck = false;
+  private previousControlState = this.player.controlState;
+  public offsideLineY: number | null = null;
+
+  private readonly offsideAttacker = { id: 0, pos: new Vec2(), involvedInPlay: true };
+  private readonly offsideDefenderA = { id: 1, pos: new Vec2() };
+  private readonly offsideDefenderB = { id: 2, pos: new Vec2() };
+  private readonly offsideAttackers = [this.offsideAttacker];
+  private readonly offsideDefenders = [this.offsideDefenderA, this.offsideDefenderB];
 
   get isGoalCelebration(): boolean {
     return this.goalPauseTicks > 0;
@@ -88,6 +106,7 @@ export class GameEngine {
       this.tick();
       this.captureState(this.currentState, this.previousState.tick + 1);
       this.replayBuffer.push(cloneWorldState(this.currentState));
+      this.replayRecorder.recordFrame(this.currentState.tick, this.input.currentFrame);
       this.accumulator -= this.dt;
       this.ticksThisSecond++;
     }
@@ -114,6 +133,17 @@ export class GameEngine {
 
     this.matchElapsed += this.dt;
     this.input.update();
+
+    const passReleased =
+      (this.input.currentFrame.passReleased || this.input.currentFrame.throughPassReleased) &&
+      this.player.isCharging &&
+      this.player.chargeType === 'pass';
+    if (passReleased) {
+      this.ballPlayPos.set(this.ball.pos.x, this.ball.pos.y);
+      this.playerPosAtPlay.copy(this.player.pos);
+      this.awaitingOffsideCheck = true;
+    }
+
     const velBefore = this.ball.vel.mag();
     const zVelBefore = this.ball.vel.z;
     const playerShooting =
@@ -125,6 +155,9 @@ export class GameEngine {
     this.keeper.update(this.dt, this.ball);
     this.opponent.update(this.dt, this.ball, this.player);
     this.ball.update(this.dt);
+
+    this.updateOffsideLine();
+    this.checkOffsideOnReceive();
 
     if (this.ball.pos.z === 0 && zVelBefore < -0.5) {
       this.pendingEvents.push({ type: 'bounce', intensity: Math.min(1, Math.abs(zVelBefore) / 8) });
@@ -142,8 +175,53 @@ export class GameEngine {
       }
     }
 
+    this.previousControlState = this.player.controlState;
     this.checkGoals();
     this.enforceBoundaries();
+  }
+
+  private updateOffsideLine() {
+    this.offsideDefenderA.pos.copy(this.opponent.pos);
+    this.offsideDefenderB.pos.copy(this.keeper.pos);
+    this.offsideLineY = this.offsideDetector.getOffsideLine(
+      this.offsideAttackers,
+      this.offsideDefenders,
+      1,
+    );
+  }
+
+  private checkOffsideOnReceive() {
+    if (!this.awaitingOffsideCheck) return;
+
+    const curr = this.player.controlState;
+    const prev = this.previousControlState;
+    const regainedControl =
+      (curr === 'under_control' || curr === 'shielding') &&
+      (prev === 'free' || prev === 'loose_nearby' || prev === 'receiving' || prev === 'stretching');
+
+    if (!regainedControl) return;
+
+    this.offsideAttacker.pos.copy(this.playerPosAtPlay);
+    this.offsideDefenderA.pos.copy(this.opponent.pos);
+    this.offsideDefenderB.pos.copy(this.keeper.pos);
+
+    const result = this.offsideDetector.checkOffside(
+      this.ballPlayPos,
+      this.offsideAttackers,
+      this.offsideDefenders,
+      1,
+    );
+
+    this.awaitingOffsideCheck = false;
+
+    if (!result?.isOffside) return;
+
+    this.ball.pos.x = this.ballPlayPos.x;
+    this.ball.pos.y = this.ballPlayPos.y;
+    this.ball.pos.z = 0;
+    this.ball.vel.set(0, 0, 0);
+    this.player.controlState = 'free';
+    this.pendingEvents.push({ type: 'offside', side: 'player' }, { type: 'whistle' });
   }
 
   private checkGoals() {
@@ -171,6 +249,8 @@ export class GameEngine {
     this.player.controlState = 'free';
     this.player.isCharging = false;
     this.player.chargeStart = 0;
+    this.awaitingOffsideCheck = false;
+    this.previousControlState = 'free';
 
     this.ball.pos.set(0, 0, 0);
     this.ball.vel.set(0, 0, 0);
@@ -190,6 +270,8 @@ export class GameEngine {
     state.player.isCharging = this.player.isCharging;
     state.player.chargeStart = this.player.chargeStart;
     state.player.chargeType = this.player.chargeType;
+    state.player.passModifier = this.player.activePassModifier;
+    state.player.shotModifier = this.player.activeShotModifier;
 
     state.ball.pos.copy(this.ball.pos);
     state.ball.vel.copy(this.ball.vel);
@@ -206,6 +288,7 @@ export class GameEngine {
     state.scorePlayer = this.scorePlayer;
     state.scoreOpponent = this.scoreOpponent;
     state.lastGoalScorer = this.lastGoalScorer;
+    state.offsideLineY = this.offsideLineY;
   }
 
   private enforceBoundaries() {

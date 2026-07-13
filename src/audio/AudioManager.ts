@@ -1,4 +1,4 @@
-import { Howl } from 'howler';
+import { Howl, Howler } from 'howler';
 import {
   generateKickSound,
   generateGoalSound,
@@ -75,6 +75,33 @@ export class AudioManager {
     this.lastBounceTime = now;
     this.bounce.volume(Math.min(0.5, 0.15 + intensity * 0.2));
     this.bounce.play();
+  }
+
+  /** Sync Howler listener to the broadcast camera (physics X→X, Y→-Z, Z→Y). */
+  updateListener(
+    cameraX: number,
+    cameraY: number,
+    cameraZ: number,
+    lookX: number,
+    lookY: number,
+    lookZ: number,
+  ) {
+    if (!this.initialized || typeof window === 'undefined') return;
+    const fx = lookX - cameraX;
+    const fy = lookY - cameraY;
+    const fz = lookZ - cameraZ;
+    const len = Math.hypot(fx, fy, fz) || 1;
+    Howler.pos(cameraX, cameraY, cameraZ);
+    Howler.orientation(fx / len, fy / len, fz / len, 0, 1, 0);
+  }
+
+  /** Place a one-shot at a world position for spatial kick/bounce audio. */
+  playAt(id: 'kick' | 'bounce', x: number, y: number, z: number, volume = 1) {
+    if (!this.enabled || !this.initialized) return;
+    const sound = id === 'kick' ? this.kick : this.bounce;
+    sound.pos(x, y, z);
+    sound.volume(volume);
+    sound.play();
   }
 }
 

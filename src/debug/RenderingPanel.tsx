@@ -8,6 +8,7 @@ import { addStadiumToScene } from '../scene/createStadium';
 import { BallTrail, GoalCelebration } from '../scene/effects';
 import { CameraController } from '../camera/CameraController';
 import { useSettingsStore } from '../store/settingsStore';
+import { audioManager } from '../audio/AudioManager';
 
 interface RenderingPanelProps {
   useWasm: boolean;
@@ -201,6 +202,7 @@ export function RenderingPanel({
     let ballTrail: BallTrail | null = null;
     let requestId = 0;
     let goalTimeout: number | undefined;
+    let statsPanel: { dom: HTMLElement; update: () => void } | null = null;
 
     const initialise = async () => {
       renderer = await RendererFactory.createRenderer(canvasRef.current!);
@@ -265,6 +267,21 @@ export function RenderingPanel({
       const cameraController = new CameraController();
       let lastBallSpeed = 0;
       let lastFrameTime = performance.now();
+
+      if (process.env.NODE_ENV === 'development') {
+        import('stats.js').then(({ default: Stats }) => {
+          if (cancelled) return;
+          const stats = new Stats();
+          stats.showPanel(0);
+          stats.dom.style.position = 'absolute';
+          stats.dom.style.top = '8px';
+          stats.dom.style.left = '50%';
+          stats.dom.style.transform = 'translateX(-50%)';
+          stats.dom.style.zIndex = '30';
+          canvasRef.current?.parentElement?.appendChild(stats.dom);
+          statsPanel = stats;
+        });
+      }
 
       const offsideLine = new THREE.Mesh(
         new THREE.PlaneGeometry(68, 0.16),
@@ -342,8 +359,10 @@ export function RenderingPanel({
 
         goalCelebration.update(dt);
 
-        offsideLine.visible = showOffsideLineRef.current;
-        if (offsideLine.visible) offsideLine.position.z = -state.opponent.pos.y;
+        offsideLine.visible = showOffsideLineRef.current && state.offsideLineY !== null;
+        if (offsideLine.visible && state.offsideLineY !== null) {
+          offsideLine.position.z = -state.offsideLineY;
+        }
 
         const settings = useSettingsStore.getState();
         cameraController.update(camera, state, dt, {
@@ -351,6 +370,19 @@ export function RenderingPanel({
           shakeEnabled: settings.cameraShake,
           zoomIntensity: settings.zoomIntensity,
         });
+
+        const lookX = state.player.pos.x * 0.42;
+        const lookZ = -(state.player.pos.y * 0.58 + state.ball.pos.y * 0.42);
+        audioManager.updateListener(
+          camera.position.x,
+          camera.position.y,
+          camera.position.z,
+          lookX,
+          0,
+          lookZ,
+        );
+
+        statsPanel?.update();
         renderer.render(scene, camera);
       };
 
@@ -369,6 +401,7 @@ export function RenderingPanel({
       cancelled = true;
       cancelAnimationFrame(requestId);
       if (goalTimeout) window.clearTimeout(goalTimeout);
+      statsPanel?.dom.remove();
       window.removeEventListener('resize', resize);
       ballTrail?.dispose();
       renderer?.dispose?.();

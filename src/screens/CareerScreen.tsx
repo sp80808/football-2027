@@ -6,9 +6,10 @@ import { ChevronLeft, Calendar, Users, TrendingUp, Trophy } from 'lucide-react';
 
 interface CareerScreenProps {
   onBack: () => void;
+  onPlayMatch: () => void;
 }
 
-export const CareerScreen: React.FC<CareerScreenProps> = ({ onBack }) => {
+export const CareerScreen: React.FC<CareerScreenProps> = ({ onBack, onPlayMatch }) => {
   return (
     <div className="w-screen h-screen bg-slate-950 flex flex-col p-8 relative overflow-hidden">
       <div className="absolute -bottom-1/2 -right-1/4 w-full h-full bg-emerald-600/5 blur-[200px] rounded-full" />
@@ -30,7 +31,7 @@ export const CareerScreen: React.FC<CareerScreenProps> = ({ onBack }) => {
                 <h2 className="text-4xl font-black text-white uppercase tracking-tighter m-0 mb-1">vs Local Rivals</h2>
                 <p className="text-slate-400 text-sm">Sat, 14 Aug - Home - Premier Division</p>
               </div>
-              <Button size="lg" className="bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-emerald-500/30">
+              <Button size="lg" className="bg-emerald-600 hover:bg-emerald-500 border-emerald-400 shadow-emerald-500/30" onClick={onPlayMatch}>
                 Play Match <Calendar className="ml-2" size={20} />
               </Button>
             </div>

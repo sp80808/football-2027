@@ -53,4 +53,13 @@ describe('GameEngine Simulation', () => {
     // Test fails if it takes more than 1 second to simulate 1000 seconds (should be very fast)
     expect(end - start).toBeLessThan(1000);
   });
+
+  it('computes offside line during simulation', () => {
+    const engine = new GameEngine();
+    engine.init();
+    for (let t = 16; t <= 200; t += 16) engine.update(t);
+    const state = engine.getRenderState();
+    expect(state.offsideLineY).not.toBeNull();
+    expect(typeof state.offsideLineY).toBe('number');
+  });
 });

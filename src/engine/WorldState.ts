@@ -42,6 +42,7 @@ export interface WorldState {
   scorePlayer: number;
   scoreOpponent: number;
   lastGoalScorer: 'player' | 'opponent' | null;
+  offsideLineY: number | null;
 }
 
 export function createEmptyWorldState(): WorldState {
@@ -76,6 +77,7 @@ export function createEmptyWorldState(): WorldState {
     scorePlayer: 0,
     scoreOpponent: 0,
     lastGoalScorer: null,
+    offsideLineY: null,
   };
 }
 
@@ -111,6 +113,7 @@ export function cloneWorldState(state: WorldState): WorldState {
     scorePlayer: state.scorePlayer,
     scoreOpponent: state.scoreOpponent,
     lastGoalScorer: state.lastGoalScorer,
+    offsideLineY: state.offsideLineY,
   };
 }
 

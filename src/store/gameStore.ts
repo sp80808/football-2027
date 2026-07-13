@@ -3,7 +3,7 @@ import { MatchPhase, MatchSnapshot } from '../engine/MatchManager';
 import { audioManager } from '../audio/AudioManager';
 import { displayMatchMinute, getMatchHalf } from '../utils/matchTime';
 
-export type PlayEventKind = 'goal' | 'shot' | 'foul' | 'tackle' | 'kick';
+export type PlayEventKind = 'goal' | 'shot' | 'foul' | 'tackle' | 'kick' | 'offside';
 
 export interface PlayEvent {
   id: string;
