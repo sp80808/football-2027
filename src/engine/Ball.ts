@@ -36,16 +36,15 @@ export class Ball {
       this.vel.z -= cfg.BALL_GRAVITY * dt;
     }
 
-    // Air drag (quadratic)
-    const speed = this.vel.mag();
-    if (speed > 0) {
-      const dragForce = 0.5 * this.airDensity * speed * speed * this.crossSection * cfg.BALL_AIR_DRAG;
-      const dragAccel = dragForce / this.mass;
-      this.vel.mul(Math.max(0, 1 - dragAccel * dt / speed));
+    // Air drag (legacy exponential tuning while airborne)
+    if (this.pos.z > this.radius) {
+      const airDragMultiplier = Math.pow(cfg.BALL_AIR_DRAG, dt);
+      this.vel.x *= airDragMultiplier;
+      this.vel.y *= airDragMultiplier;
     }
 
     // Magnus effect (spin-induced lift)
-    if (this.pos.z > 0 && this.spin.mag() > 0) {
+    if (this.pos.z > this.radius && this.spin.mag() > 0) {
       this.applyMagnusForce(dt);
     }
 
