@@ -42,8 +42,6 @@ export class GameEngine {
   private pendingEvents: SimEvent[] = [];
   private matchElapsed = 0;
 
-  private matchElapsed = 0;
-
   get isGoalCelebration(): boolean {
     return this.goalPauseTicks > 0;
   }
