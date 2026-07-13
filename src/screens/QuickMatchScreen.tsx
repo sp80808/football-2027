@@ -30,7 +30,7 @@ export const QuickMatchScreen: React.FC<QuickMatchScreenProps> = ({ onBack, onSt
 
       <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 items-center justify-center gap-12">
         <motion.div initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex-1">
-          <Panel className="border-accent-player-border bg-gradient-to-br from-surface-elevated to-accent-player-bg/20 shadow-glass">
+          <Panel hoverable className="border-accent-player-border bg-gradient-to-br from-surface-elevated to-accent-player-bg/20 shadow-glass">
             <div className="mb-8 flex items-center justify-between border-b border-border pb-4">
               <h2 className="m-0 text-3xl font-black uppercase tracking-wide text-text-primary">Home Team</h2>
               <div className="flex items-center gap-2 rounded-[var(--radius-pill)] border border-accent-player-border bg-accent-player-bg px-3 py-1 text-sm font-bold uppercase tracking-wider text-accent-player">
@@ -56,7 +56,7 @@ export const QuickMatchScreen: React.FC<QuickMatchScreenProps> = ({ onBack, onSt
         <div className="text-4xl font-black italic tracking-tighter text-text-subtle">VS</div>
 
         <motion.div initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="flex-1">
-          <Panel className="border-accent-opponent-border bg-gradient-to-br from-surface-elevated to-accent-opponent-bg/20 shadow-glass">
+          <Panel hoverable className="border-accent-opponent-border bg-gradient-to-br from-surface-elevated to-accent-opponent-bg/20 shadow-glass">
             <div className="mb-8 flex items-center justify-between border-b border-border pb-4">
               <h2 className="m-0 text-3xl font-black uppercase tracking-wide text-text-primary">Away Team</h2>
               <div className="flex items-center gap-2 rounded-[var(--radius-pill)] border border-accent-opponent-border bg-accent-opponent-bg px-3 py-1 text-sm font-bold uppercase tracking-wider text-accent-opponent">

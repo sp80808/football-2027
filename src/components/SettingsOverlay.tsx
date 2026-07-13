@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion } from 'motion/react';
-import { X } from 'lucide-react';
+import { X, Volume2, VolumeX } from 'lucide-react';
 import { useSettingsStore, CameraMode, ZoomIntensity } from '../store/settingsStore';
 import { useGameStore } from '../store/gameStore';
 import { COMMENTARY_VOICES } from '../audio/commentaryTtsConfig';
@@ -87,7 +87,7 @@ export function SettingsOverlay() {
         <section className="mb-5 space-y-3">
           <Toggle label="Camera shake" checked={cameraShake} onChange={setCameraShake} />
           <Toggle label="Control hints" checked={showControlHints} onChange={setShowControlHints} />
-          <Toggle label="Sound" checked={audioEnabled} onChange={(on) => { if (on !== audioEnabled) toggleAudio(); }} />
+          <Toggle label="Sound" checked={audioEnabled} onChange={(on) => { if (on !== audioEnabled) toggleAudio(); }} onIcon={<Volume2 size={12} />} offIcon={<VolumeX size={12} />} />
           <Toggle label="Commentary" checked={commentaryEnabled} onChange={setCommentaryEnabled} />
         </section>
 
