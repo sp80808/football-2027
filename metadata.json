@@ -1,0 +1,6 @@
+{
+  "name": "Football Engine Prototype",
+  "description": "A real-time 3D football physics and movement sandbox with analog control, soft possession, and deterministic simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
