@@ -1,7 +1,10 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Button } from '../components/ui/Button';
-import { Play, Trophy, Settings, X } from 'lucide-react';
+import { ControlBindingsPanel } from '../components/ControlGlyph';
+import { MenuBackdrop } from '../components/MenuBackdrop';
+import { CORE_BINDINGS } from '../input/controlBindings';
+import { Play, Trophy, Settings } from 'lucide-react';
 
 interface MainMenuScreenProps {
   onNavigate: (screen: 'quickMatch' | 'career' | 'settings') => void;
@@ -10,91 +13,93 @@ interface MainMenuScreenProps {
 export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({ onNavigate }) => {
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { 
+    visible: {
       opacity: 1,
-      transition: { 
-        staggerChildren: 0.1,
-        delayChildren: 0.2
-      }
-    }
+      transition: { staggerChildren: 0.08, delayChildren: 0.15 },
+    },
   };
 
   const itemVariants = {
-    hidden: { x: -50, opacity: 0 },
-    visible: { x: 0, opacity: 1, transition: { type: 'spring' as const, stiffness: 300, damping: 24 } },
+    hidden: { y: 16, opacity: 0 },
+    visible: { y: 0, opacity: 1, transition: { type: 'spring' as const, stiffness: 320, damping: 26 } },
   };
 
   return (
-    <div className="w-screen h-screen bg-slate-950 flex relative overflow-hidden">
-      {/* Background Graphic */}
-      <div className="absolute top-0 right-0 w-2/3 h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-900/10 to-transparent opacity-60" />
-      <div className="absolute -right-40 top-1/2 -translate-y-1/2 opacity-10">
-         {/* Placeholder for a large stylized football or player graphic */}
-         <div className="w-[800px] h-[800px] rounded-full border-[40px] border-blue-500/20" />
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="relative flex h-screen w-screen overflow-hidden bg-surface"
+    >
+      <MenuBackdrop />
+
+      <div className="relative z-10 flex h-full w-full flex-col px-8 py-10 md:px-16 lg:px-24">
+        <div className="flex flex-1 flex-col justify-center gap-10 lg:flex-row lg:items-center lg:justify-between">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="max-w-xl"
+          >
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.4em] text-accent-player">Season 2027</p>
+            <h1 className="mb-3 text-5xl font-black tracking-tighter text-text-primary md:text-6xl lg:text-7xl">
+              FOOTBALL
+              <span className="block bg-gradient-to-r from-accent-action to-accent-player bg-clip-text text-transparent">
+                2027
+              </span>
+            </h1>
+            <p className="max-w-md text-base text-text-secondary md:text-lg">
+              Deterministic broadcast football. Quick matches, career arcs, and FC26-style controls on any device.
+            </p>
+          </motion.div>
+
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="flex w-full max-w-sm flex-col gap-3"
+          >
+            <motion.div variants={itemVariants}>
+              <Button size="lg" className="w-full justify-start gap-3 pl-6 text-lg" onClick={() => onNavigate('quickMatch')}>
+                <Play className="text-accent-action" size={22} />
+                Quick Match
+              </Button>
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <Button
+                variant="secondary"
+                size="lg"
+                className="w-full justify-start gap-3 pl-6 text-lg"
+                onClick={() => onNavigate('career')}
+              >
+                <Trophy className="text-accent-player" size={22} />
+                Career Mode
+              </Button>
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <Button
+                variant="secondary"
+                size="lg"
+                className="w-full justify-start gap-3 pl-6 text-lg"
+                onClick={() => onNavigate('settings')}
+              >
+                <Settings className="text-text-muted" size={22} />
+                Settings
+              </Button>
+            </motion.div>
+          </motion.div>
+        </div>
+
+        <div className="mt-8">
+          <ControlBindingsPanel bindings={CORE_BINDINGS} title="Your controls" className="max-w-md border-border-strong bg-surface-hud/80" />
+        </div>
+
+        {import.meta.env.DEV && (
+          <p className="absolute bottom-4 right-6 font-mono text-[10px] text-text-subtle">
+            dev · v{import.meta.env.VITE_APP_VERSION ?? '0.1.0'}
+          </p>
+        )}
       </div>
-
-      <div className="w-1/2 h-full flex flex-col justify-center px-24 z-10">
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-16"
-        >
-          <h1 className="text-5xl font-black text-white tracking-tighter mb-2">FOOTBALL 2027</h1>
-          <div className="h-1 w-24 bg-blue-500 rounded-full" />
-        </motion.div>
-
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="flex flex-col gap-4 w-80"
-        >
-          <motion.div variants={itemVariants}>
-            <Button 
-              size="lg" 
-              className="w-full justify-start pl-6 text-xl"
-              onClick={() => onNavigate('quickMatch')}
-            >
-              <Play className="text-blue-400 mr-2" size={24} />
-              Quick Match
-            </Button>
-          </motion.div>
-          
-          <motion.div variants={itemVariants}>
-            <Button 
-              variant="secondary" 
-              size="lg" 
-              className="w-full justify-start pl-6 text-xl"
-              onClick={() => onNavigate('career')}
-            >
-              <Trophy className="text-emerald-400 mr-2" size={24} />
-              Career Mode
-            </Button>
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <Button 
-              variant="secondary" 
-              size="lg" 
-              className="w-full justify-start pl-6 text-xl"
-              onClick={() => onNavigate('settings')}
-            >
-              <Settings className="text-slate-400 mr-2" size={24} />
-              Settings
-            </Button>
-          </motion.div>
-        </motion.div>
-        
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="absolute bottom-12 text-sm text-slate-500 font-mono"
-        >
-          v0.1.0 Alpha Build
-        </motion.div>
-      </div>
-    </div>
+    </motion.div>
   );
 };

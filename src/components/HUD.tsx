@@ -26,6 +26,9 @@ import { useSettingsStore } from '../store/settingsStore';
 import { modifierLabel } from '../engine/PlayerIntentParser';
 import type { PassModifier, ShotModifier } from '../engine/Intent';
 import { formatBroadcastClock, getPeriodLabel } from '../utils/matchTime';
+import { ControlBindingsPanel } from './ControlGlyph';
+import { ControlBindingsPanel } from './ControlGlyph';
+import { ControlBindingsPanel } from './ControlGlyph';
 
 interface HUDProps {
   engine: GameEngine;

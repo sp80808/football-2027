@@ -1,44 +1,48 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
 import { Button } from '../components/ui/Button';
 import { Panel } from '../components/ui/Panel';
+import { ControlBindingsPanel } from '../components/ControlGlyph';
+import { MenuBackdrop } from '../components/MenuBackdrop';
 import { ChevronLeft } from 'lucide-react';
 
 interface SettingsScreenProps {
   onBack: () => void;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
-  const [activeTab, setActiveTab] = useState<'video' | 'audio' | 'gameplay'>('gameplay');
+type SettingsTab = 'gameplay' | 'video' | 'audio' | 'controls';
 
-  const tabs = [
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('gameplay');
+
+  const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'gameplay', label: 'Gameplay' },
+    { id: 'controls', label: 'Controls' },
     { id: 'video', label: 'Video' },
-    { id: 'audio', label: 'Audio' }
+    { id: 'audio', label: 'Audio' },
   ];
 
   return (
-    <div className="w-screen h-screen bg-slate-950 flex flex-col p-8 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-1/2 h-1/2 bg-blue-600/10 blur-[100px] rounded-full" />
-      
-      <div className="flex items-center gap-6 mb-8 z-10">
+    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-surface p-8">
+      <MenuBackdrop />
+
+      <div className="relative z-10 mb-8 flex items-center gap-6">
         <Button variant="ghost" onClick={onBack} className="p-2">
           <ChevronLeft size={32} />
         </Button>
-        <h1 className="text-4xl font-bold text-white uppercase tracking-wider m-0">Settings</h1>
+        <h1 className="m-0 text-4xl font-bold uppercase tracking-wider text-text-primary">Settings</h1>
       </div>
 
-      <div className="flex flex-1 gap-8 z-10 max-w-6xl mx-auto w-full">
-        <Panel className="w-64 h-fit">
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 gap-8">
+        <Panel className="h-fit w-64">
           <div className="flex flex-col gap-2">
-            {tabs.map(tab => (
+            {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`text-left px-4 py-3 rounded-md transition-colors font-bold tracking-wide uppercase ${
-                  activeTab === tab.id 
-                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                onClick={() => setActiveTab(tab.id)}
+                className={`rounded-md px-4 py-3 text-left font-bold uppercase tracking-wide transition-colors ${
+                  activeTab === tab.id
+                    ? 'border border-accent-action-border bg-accent-action-bg text-accent-action'
+                    : 'text-text-muted hover:bg-white/5 hover:text-text-primary'
                 }`}
               >
                 {tab.label}
@@ -51,12 +55,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
           <div className="flex flex-col gap-6">
             {activeTab === 'gameplay' && (
               <>
-                <div className="flex justify-between items-center p-4 bg-slate-800/50 rounded-lg">
+                <div className="flex items-center justify-between rounded-lg bg-white/5 p-4">
                   <div>
-                    <h3 className="text-white font-bold text-lg m-0">Difficulty</h3>
-                    <p className="text-slate-400 text-sm m-0">Adjust AI intelligence and reaction time</p>
+                    <h3 className="m-0 text-lg font-bold text-text-primary">Difficulty</h3>
+                    <p className="m-0 text-sm text-text-muted">Adjust AI intelligence and reaction time</p>
                   </div>
-                  <select className="bg-slate-900 text-white border border-slate-700 rounded p-2 px-4 outline-none focus:border-blue-500">
+                  <select className="rounded border border-border bg-surface px-4 py-2 text-text-primary outline-none focus:border-accent-action">
                     <option>Amateur</option>
                     <option>Semi-Pro</option>
                     <option>Professional</option>
@@ -64,12 +68,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
                     <option>Legendary</option>
                   </select>
                 </div>
-                <div className="flex justify-between items-center p-4 bg-slate-800/50 rounded-lg">
+                <div className="flex items-center justify-between rounded-lg bg-white/5 p-4">
                   <div>
-                    <h3 className="text-white font-bold text-lg m-0">Match Length</h3>
-                    <p className="text-slate-400 text-sm m-0">Duration of each half</p>
+                    <h3 className="m-0 text-lg font-bold text-text-primary">Match Length</h3>
+                    <p className="m-0 text-sm text-text-muted">Duration of each half</p>
                   </div>
-                  <select className="bg-slate-900 text-white border border-slate-700 rounded p-2 px-4 outline-none focus:border-blue-500">
+                  <select className="rounded border border-border bg-surface px-4 py-2 text-text-primary outline-none focus:border-accent-action">
                     <option>3 Mins</option>
                     <option>5 Mins</option>
                     <option>10 Mins</option>
@@ -77,26 +81,30 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
                 </div>
               </>
             )}
+
+            {activeTab === 'controls' && (
+              <ControlBindingsPanel title="Control reference" className="border-border-strong bg-surface-hud/60" />
+            )}
+
             {activeTab === 'video' && (
-              <div className="flex justify-between items-center p-4 bg-slate-800/50 rounded-lg">
-                 <div>
-                    <h3 className="text-white font-bold text-lg m-0">Render Quality</h3>
-                    <p className="text-slate-400 text-sm m-0">Affects performance and visuals</p>
-                  </div>
-                  <select className="bg-slate-900 text-white border border-slate-700 rounded p-2 px-4 outline-none focus:border-blue-500">
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
-                    <option>Ultra</option>
-                  </select>
+              <div className="flex items-center justify-between rounded-lg bg-white/5 p-4">
+                <div>
+                  <h3 className="m-0 text-lg font-bold text-text-primary">Render Quality</h3>
+                  <p className="m-0 text-sm text-text-muted">Affects performance and visuals</p>
+                </div>
+                <select className="rounded border border-border bg-surface px-4 py-2 text-text-primary outline-none focus:border-accent-action">
+                  <option>Low</option>
+                  <option>Medium</option>
+                  <option>High</option>
+                  <option>Ultra</option>
+                </select>
               </div>
             )}
+
             {activeTab === 'audio' && (
-              <div className="flex flex-col gap-4 p-4 bg-slate-800/50 rounded-lg">
-                 <div>
-                    <h3 className="text-white font-bold text-lg m-0 mb-4">Master Volume</h3>
-                  </div>
-                  <input type="range" className="w-full accent-blue-500" />
+              <div className="flex flex-col gap-4 rounded-lg bg-white/5 p-4">
+                <h3 className="m-0 mb-4 text-lg font-bold text-text-primary">Master Volume</h3>
+                <input type="range" className="w-full accent-accent-action" />
               </div>
             )}
           </div>
