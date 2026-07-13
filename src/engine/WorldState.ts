@@ -1,7 +1,6 @@
 import { Vec2, Vec3 } from './Math';
 import { BallControlState } from './Player';
 import { OpponentState } from './Opponent';
-import { KeeperState } from './Keeper';
 
 export interface PlayerState {
   pos: Vec2;
@@ -21,7 +20,7 @@ export interface BallState {
 export interface KeeperWorldState {
   pos: Vec2;
   facing: Vec2;
-  aiState: KeeperState;
+  aiState: 'positioning' | 'diving' | 'recovering';
 }
 
 export interface OpponentWorldState {

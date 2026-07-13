@@ -18,6 +18,10 @@ export const SimulationConfig = {
     return this.GOAL_WIDTH / 2;
   },
 
+  MATCH_DURATION_SECONDS: 90,
+  GOAL_CELEBRATION_SECONDS: 3.0,
+  KICKOFF_DELAY_SECONDS: 2.0,
+
   BALL_RADIUS: 0.11,
   BALL_MASS: 0.43,
   BALL_FRICTION: 0.965,

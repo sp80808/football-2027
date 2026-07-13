@@ -8,6 +8,12 @@ import { WorldState, createEmptyWorldState, cloneWorldState, interpolateWorldSta
 import { SeededRandom } from './SeededRandom';
 import { RingBuffer } from './RingBuffer';
 
+export type SimEvent =
+  | { type: 'kick'; power: number }
+  | { type: 'bounce'; intensity: number }
+  | { type: 'goal' }
+  | { type: 'whistle' };
+
 export class GameEngine {
   input = new InputSystem();
   player = new Player();
@@ -33,6 +39,24 @@ export class GameEngine {
   public lastGoalScorer: 'player' | 'opponent' | null = null;
   private goalPauseTicks = -1;
   private readonly goalPauseDurationTicks = SimulationConfig.SIMULATION_HZ * 3;
+  private pendingEvents: SimEvent[] = [];
+  private matchElapsed = 0;
+
+  private matchElapsed = 0;
+
+  get isGoalCelebration(): boolean {
+    return this.goalPauseTicks > 0;
+  }
+
+  get elapsedSeconds(): number {
+    return this.matchElapsed;
+  }
+
+  drainEvents(): SimEvent[] {
+    const events = this.pendingEvents;
+    this.pendingEvents = [];
+    return events;
+  }
 
   init() {
     this.input.init();
@@ -84,15 +108,29 @@ export class GameEngine {
         this.goalPauseTicks = -1;
         this.lastGoalScorer = null;
         this.resetPositions();
+        this.pendingEvents.push({ type: 'whistle' });
       }
       return;
     }
 
+    this.matchElapsed += this.dt;
     this.input.update();
+    const velBefore = this.ball.vel.mag();
+    const zVelBefore = this.ball.vel.z;
+
     this.player.update(this.dt, this.input.currentFrame, this.ball);
     this.keeper.update(this.dt, this.ball);
     this.opponent.update(this.dt, this.ball, this.player);
     this.ball.update(this.dt);
+
+    if (this.ball.pos.z === 0 && zVelBefore < -0.5) {
+      this.pendingEvents.push({ type: 'bounce', intensity: Math.min(1, Math.abs(zVelBefore) / 8) });
+    }
+    const velAfter = this.ball.vel.mag();
+    if (velAfter - velBefore > 6) {
+      this.pendingEvents.push({ type: 'kick', power: Math.min(1, (velAfter - velBefore) / 20) });
+    }
+
     this.checkGoals();
     this.enforceBoundaries();
   }
@@ -106,10 +144,12 @@ export class GameEngine {
       this.scorePlayer++;
       this.lastGoalScorer = 'player';
       this.goalPauseTicks = this.goalPauseDurationTicks;
+      this.pendingEvents.push({ type: 'goal' }, { type: 'whistle' });
     } else if (this.ball.pos.y <= -cfg.PITCH_HALF_LENGTH) {
       this.scoreOpponent++;
       this.lastGoalScorer = 'opponent';
       this.goalPauseTicks = this.goalPauseDurationTicks;
+      this.pendingEvents.push({ type: 'goal' }, { type: 'whistle' });
     }
   }
 
