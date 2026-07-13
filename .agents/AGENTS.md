@@ -40,3 +40,12 @@ When mapping positions between the simulation engine and the visual layer (Three
 1. After making any gameplay engine modification, verify correctness by writing a unit test in the `tests/` directory and running `pnpm test`.
 2. Ensure that code changes build successfully via `pnpm build` before marking tasks as completed.
 3. Check code type-safety by running `pnpm lint` after any refactor.
+
+---
+
+## 5. Learned (project-specific)
+
+* **Active rendering:** `src/debug/RenderingPanel.tsx` — not `src/legacy/r3f/`.
+* **Router:** `App.tsx` — Splash → Main Menu → Quick Match / Career → Gameplay.
+* **Career:** Zod + `localStorage` in `src/career/careerStore.ts`.
+* **Docs:** [docs/README.md](../docs/README.md), [ARCHITECTURE.md](../docs/ARCHITECTURE.md), [CONTROLS.md](../docs/CONTROLS.md).

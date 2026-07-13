@@ -1,5 +1,7 @@
 # WebGPU Rendering Architecture
 
+> **Active path:** `RenderingPanel.tsx` (vanilla Three.js). R3F in `legacy/r3f/` is quarantined.
+
 ## RendererFactory
 Attempts to initialize `THREE.WebGPURenderer`. If it fails (due to unsupported browser/hardware), it falls back to `THREE.WebGLRenderer`.
 

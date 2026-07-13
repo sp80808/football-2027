@@ -150,3 +150,4 @@ Every feature PR must answer:
 - Can it be disabled without corrupting a save?
 
 A PR that cannot answer these questions should remain a design issue, experiment branch or research document.
+See also: [DEVELOPMENT.md](./DEVELOPMENT.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [CONTROLS.md](./CONTROLS.md).

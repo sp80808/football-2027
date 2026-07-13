@@ -13,14 +13,14 @@ gantt
     title Football 2027 Development Timeline
     dateFormat  YYYY-MM
     section Phase 1: Foundation
-    Completed Core Architecture :done, 2026-06, 2026-07
+    Core Architecture & Screens :done, 2026-06, 2026-07
     section Phase 2: Expressive Control
-    Sprint 2.1: Input Intent Parser :active, 2026-07, 2026-08
-    Sprint 2.2: Advanced First Touch :active, 2026-08, 2026-08
-    Sprint 2.3: Player Shielding : 2026-08, 2026-09
+    Sprint 2.1: Input Intent Parser :done, 2026-07, 2026-08
+    Sprint 2.2: Advanced First Touch :done, 2026-08, 2026-08
+    Sprint 2.3: Player Shielding :done, 2026-07, 2026-09
     Sprint 2.4: Contextual Targeting : 2026-09, 2026-09
     section Phase 3: Defensive & AI
-    Sprint 3.1: Tackle Mechanics & Windows : 2026-09, 2026-10
+    Sprint 3.1: Tackle Mechanics & Windows :done, 2026-07, 2026-10
     Sprint 3.2: Defending Jockey & Pressing : 2026-10, 2026-10
     Sprint 3.3: Advanced Goalkeeper AI : 2026-10, 2026-11
     Sprint 3.4: Team Tactics & Policies : 2026-11, 2026-11
@@ -29,7 +29,7 @@ gantt
     Sprint 4.2: 11v11 Simulation & Shapes : 2026-12, 2027-01
     Sprint 4.3: Couch Multiplayer : 2027-01, 2027-01
     section Phase 5: Career Mode
-    Sprint 5.1: SQLite/IndexedDB & State : 2027-01, 2027-02
+    Sprint 5.1: Career Scaffold (Zod + localStorage) :done, 2026-07, 2027-02
     Sprint 5.2: Zod Schemas & Career Data : 2027-02, 2027-02
     Sprint 5.3: Gemini-powered AI Scouting : 2027-02, 2027-03
 ```
@@ -230,6 +230,9 @@ Phase 3 introduces physics-based defensive interactions and advances opponent AI
 
 ## Related documentation
 
+- [ARCHITECTURE.md](./ARCHITECTURE.md)
+- [CONTROLS.md](./CONTROLS.md)
+- [DEVELOPMENT.md](./DEVELOPMENT.md)
 - [Design system reuse audit](./DESIGN_SYSTEM_REUSE_AUDIT.md) — Figma and code alignment audit (merged from `origin/main`).
 
 ---

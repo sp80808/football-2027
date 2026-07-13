@@ -1,10 +1,26 @@
 # Football Engine 2027 - Comprehensive Development Roadmap
 
+## Current implementation snapshot (2026-07-13)
+
+| Area | Status |
+|------|--------|
+| App / screens | Implemented |
+| 120 Hz engine + MatchManager + Offside | Implemented |
+| FC26 controls + intent parser | Implemented |
+| First touch, shield, tackles | Implemented |
+| RenderingPanel (vanilla Three.js) | Implemented |
+| Career scaffold (Zod + localStorage) | Implemented |
+| 11v11 / full FIFA rules | Planned |
+
+**Docs:** [ARCHITECTURE.md](./ARCHITECTURE.md) · [CONTROLS.md](./CONTROLS.md) · [DEVELOPMENT.md](./DEVELOPMENT.md)
+
+---
+
 ## Executive Summary
 
 This roadmap outlines the strategic development plan for the Football Engine 2027 prototype, transforming it from a 1v1 sandbox into a production-ready football simulation with realistic physics, complete FIFA rule implementation, advanced AI, high-fidelity graphics, and real-world English football data integration.
 
-**Current State**: 1v1 prototype with fixed-timestep simulation (120 Hz), basic ball physics, simple AI opponent, goalkeeper with dive logic, React Three Fiber rendering, and instant replay system.
+**Current State**: 1v1 prototype with fixed-timestep simulation (120 Hz), basic ball physics, simple AI opponent, goalkeeper with dive logic, vanilla Three.js rendering, and Vitest + Playwright smoke tests.
 
 **Target State**: Full 11v11 simulation with realistic physics, complete FIFA Laws of the Game implementation, tactical AI, broadcast-quality graphics, and real English football league data.
 
