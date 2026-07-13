@@ -2,7 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { SplashScreen } from './screens/SplashScreen';
 import { MainMenuScreen } from './screens/MainMenuScreen';
 import { QuickMatchScreen } from './screens/QuickMatchScreen';
@@ -15,12 +15,14 @@ type Screen = 'splash' | 'mainMenu' | 'quickMatch' | 'career' | 'settings' | 'ga
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('splash');
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
 
   useEffect(() => {
     const syncTestSeam = () => {
       const match = useGameStore.getState();
       window.__TEST__ = {
-        screen,
+        screen: screenRef.current,
         phase: match.phase,
         homeScore: match.homeScore,
         awayScore: match.awayScore,
