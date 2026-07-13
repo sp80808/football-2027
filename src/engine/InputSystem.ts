@@ -82,8 +82,8 @@ export class InputSystem {
       switchPlayer = gp.buttons[4]?.pressed || false; // LB
     } else {
       // KB mapping
-      if (this.keys['ArrowUp'] || this.keys['KeyW']) ls.y -= 1;
-      if (this.keys['ArrowDown'] || this.keys['KeyS']) ls.y += 1;
+      if (this.keys['ArrowUp'] || this.keys['KeyW']) ls.y += 1;
+      if (this.keys['ArrowDown'] || this.keys['KeyS']) ls.y -= 1;
       if (this.keys['ArrowLeft'] || this.keys['KeyA']) ls.x -= 1;
       if (this.keys['ArrowRight'] || this.keys['KeyD']) ls.x += 1;
       if (ls.magSq() > 1) ls.normalize();
