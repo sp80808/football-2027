@@ -1,8 +1,10 @@
 @import "tailwindcss";
+
 @theme {
   --color-surface: #020617;
   --color-surface-elevated: rgb(15 23 42 / 0.82);
   --color-surface-hud: rgb(0 0 0 / 0.65);
+  --color-surface-overlay: rgb(2 6 23 / 0.95);
   --color-border: rgb(255 255 255 / 0.1);
   --color-border-strong: rgb(255 255 255 / 0.15);
   --color-text-primary: #ffffff;
@@ -19,6 +21,8 @@
   --color-accent-action-border: rgb(59 130 246 / 0.4);
   --color-accent-action-bg: rgb(59 130 246 / 0.15);
   --color-accent-warning: #fcd34d;
+  --color-accent-warning-border: rgb(245 158 11 / 0.35);
+  --color-accent-warning-bg: rgb(245 158 11 / 0.15);
   --shadow-glass: 0 25px 50px -12px rgb(0 0 0 / 0.45);
   --blur-glass: 12px;
   --radius-pill: 9999px;
