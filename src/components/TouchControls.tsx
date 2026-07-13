@@ -1,8 +1,10 @@
 import React, { useCallback, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import { Vec2 } from '../engine/Math';
 import { ControllerFrame } from '../engine/Intent';
 import { InputSystem } from '../engine/InputSystem';
 import { Crosshair, Footprints, GitBranch, Sparkles, Wind, Target } from 'lucide-react';
+import { springSnappy, tapScale, useReducedMotion } from '../ui/motionPresets';
 
 interface TouchControlsProps {
   input: InputSystem;
@@ -25,19 +27,39 @@ function TouchButtonPad({
   onUp: () => void;
   className?: string;
 }) {
+  const reduced = useReducedMotion();
+  const [rippling, setRippling] = useState(false);
+
   return (
-    <button
+    <motion.button
       type="button"
       aria-label={label}
-      className={`flex h-14 w-14 flex-col items-center justify-center rounded-full border text-[9px] font-semibold uppercase tracking-wide transition-colors select-none touch-none ${active ? 'border-white/60 bg-white/25 text-white' : 'border-white/20 bg-black/50 text-white/80'} ${className}`}
-      onPointerDown={(e) => { e.preventDefault(); onDown(); }}
+      whileTap={tapScale(reduced, 0.9)}
+      transition={springSnappy}
+      className={`relative flex h-14 w-14 flex-col items-center justify-center overflow-hidden rounded-full border text-[9px] font-semibold uppercase tracking-wide transition-colors select-none touch-none ${active ? 'border-white/60 bg-white/25 text-white' : 'border-white/20 bg-black/50 text-white/80'} ${className}`}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        if (!reduced) setRippling(true);
+        onDown();
+      }}
       onPointerUp={onUp}
       onPointerLeave={onUp}
       onPointerCancel={onUp}
     >
-      {icon}
-      <span className="mt-0.5">{label}</span>
-    </button>
+      {rippling && !reduced && (
+        <motion.span
+          initial={{ scale: 0.4, opacity: 0.5 }}
+          animate={{ scale: 2.2, opacity: 0 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="pointer-events-none absolute inset-0 rounded-full bg-white/25"
+          onAnimationComplete={() => setRippling(false)}
+        />
+      )}
+      <span className="relative z-10 flex flex-col items-center">
+        {icon}
+        <span className="mt-0.5">{label}</span>
+      </span>
+    </motion.button>
   );
 }
 

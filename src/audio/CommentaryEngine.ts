@@ -38,8 +38,8 @@ export class CommentaryEngine {
   private shuffledPools = new Map<CommentaryCategory, CommentaryTemplate[]>();
   private lastSpokenAt = 0;
   private lastBuildupAt = 0;
-  private lastShotAt = -Infinity;
-  private lastTackleAt = -Infinity;
+  private lastShotAt = 0;
+  private lastTackleAt = 0;
   private prevPhase: MatchPhase = 'pre_kickoff';
   private queue: CommentaryLine[] = [];
   private preloadedNearMiss: CommentaryLine | null = null;
@@ -49,7 +49,7 @@ export class CommentaryEngine {
   setRng(rng: () => number) { this.rng = rng; }
   reset() {
     this.usedTemplateIds.clear(); this.shuffledPools.clear(); this.lastSpokenAt = 0; this.lastBuildupAt = 0;
-    this.lastShotAt = -Infinity; this.lastTackleAt = -Infinity; this.prevPhase = 'pre_kickoff'; this.queue = [];
+    this.lastShotAt = 0; this.lastTackleAt = 0; this.prevPhase = 'pre_kickoff'; this.queue = [];
     this.preloadedNearMiss = null; this.kickoffSpoken = false;
   }
   drainLines(): CommentaryLine[] { const out = [...this.queue]; this.queue = []; return out; }
@@ -103,8 +103,8 @@ export class CommentaryEngine {
     const now = performance.now();
     switch (event.type) {
       case 'goal': { const side = event.scorer === 'player' ? 'home' : 'away'; return this.pickLine(side === 'home' ? 'goal_home' : 'goal_away', ctx, 'critical', true, side); }
-      case 'shot': { if (now - this.lastShotAt < 3000) return null; this.lastShotAt = now; const side = event.side === 'player' ? 'home' : 'away'; return this.pickLine(side === 'home' ? 'shot_home' : 'shot_away', ctx, 'high', false, side); }
-      case 'tackle': { if (now - this.lastTackleAt < 4000) return null; this.lastTackleAt = now; const side = event.side === 'player' ? 'home' : 'away'; return this.pickLine(side === 'home' ? 'tackle_home' : 'tackle_away', ctx, 'medium', false, side); }
+      case 'shot': { if (this.lastShotAt > 0 && now - this.lastShotAt < 3000) return null; this.lastShotAt = now; const side = event.side === 'player' ? 'home' : 'away'; return this.pickLine(side === 'home' ? 'shot_home' : 'shot_away', ctx, 'high', false, side); }
+      case 'tackle': { if (this.lastTackleAt > 0 && now - this.lastTackleAt < 4000) return null; this.lastTackleAt = now; const side = event.side === 'player' ? 'home' : 'away'; return this.pickLine(side === 'home' ? 'tackle_home' : 'tackle_away', ctx, 'medium', false, side); }
       case 'offside': { const side = event.side === 'player' ? 'home' : 'away'; return this.pickLine(side === 'home' ? 'offside_home' : 'offside_away', ctx, 'high', false, side); }
       default: return null;
     }

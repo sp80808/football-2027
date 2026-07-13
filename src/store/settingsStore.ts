@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import type { CommentaryVoiceId } from '../audio/commentaryTtsConfig';
+import { DEFAULT_COMMENTARY_VOICE } from '../audio/commentaryTtsConfig';
 
 export type CameraMode = 'broadcast' | 'action' | 'steady' | 'dynamic';
 export type ZoomIntensity = 'low' | 'medium' | 'high';
@@ -10,6 +12,7 @@ export interface SettingsState {
   showControlHints: boolean;
   commentaryEnabled: boolean;
   commentaryVolume: number;
+  commentaryVoice: CommentaryVoiceId;
   settingsOpen: boolean;
   activeModifierLabel: string | null;
   setCameraMode: (mode: CameraMode) => void;
@@ -18,6 +21,7 @@ export interface SettingsState {
   setShowControlHints: (show: boolean) => void;
   setCommentaryEnabled: (enabled: boolean) => void;
   setCommentaryVolume: (volume: number) => void;
+  setCommentaryVoice: (voice: CommentaryVoiceId) => void;
   setSettingsOpen: (open: boolean) => void;
   setActiveModifierLabel: (label: string | null) => void;
   flashModifierLabel: (label: string) => void;
@@ -32,25 +36,20 @@ interface PersistedSettings {
   showControlHints: boolean;
   commentaryEnabled: boolean;
   commentaryVolume: number;
+  commentaryVoice: CommentaryVoiceId;
 }
 
 function loadPersisted(): Partial<PersistedSettings> {
   if (typeof window === 'undefined') return {};
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as PersistedSettings) : {};
-  } catch {
-    return {};
-  }
+    return raw ? JSON.parse(raw) as PersistedSettings : {};
+  } catch { return {}; }
 }
 
 function persist(state: PersistedSettings) {
   if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // ignore quota errors
-  }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
 }
 
 const saved = loadPersisted();
@@ -64,6 +63,7 @@ function snapshot(get: () => SettingsState): PersistedSettings {
     showControlHints: get().showControlHints,
     commentaryEnabled: get().commentaryEnabled,
     commentaryVolume: get().commentaryVolume,
+    commentaryVoice: get().commentaryVoice,
   };
 }
 
@@ -74,29 +74,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   showControlHints: saved.showControlHints ?? true,
   commentaryEnabled: saved.commentaryEnabled ?? true,
   commentaryVolume: saved.commentaryVolume ?? 1,
+  commentaryVoice: saved.commentaryVoice ?? DEFAULT_COMMENTARY_VOICE,
   settingsOpen: false,
   activeModifierLabel: null,
-
-  setCameraMode: (cameraMode) => {
-    set({ cameraMode });
-    persist(snapshot(get));
-  },
-  setCameraShake: (cameraShake) => {
-    set({ cameraShake });
-    persist(snapshot(get));
-  },
-  setZoomIntensity: (zoomIntensity) => {
-    set({ zoomIntensity });
-    persist(snapshot(get));
-  },
-  setShowControlHints: (showControlHints) => {
-    set({ showControlHints });
-    persist(snapshot(get));
-  },
-  setCommentaryEnabled: (commentaryEnabled) => {
-    set({ commentaryEnabled });
-    persist(snapshot(get));
-  },
+  setCameraMode: (cameraMode) => { set({ cameraMode }); persist(snapshot(get)); },
+  setCameraShake: (cameraShake) => { set({ cameraShake }); persist(snapshot(get)); },
+  setZoomIntensity: (zoomIntensity) => { set({ zoomIntensity }); persist(snapshot(get)); },
+  setShowControlHints: (showControlHints) => { set({ showControlHints }); persist(snapshot(get)); },
+  setCommentaryEnabled: (commentaryEnabled) => { set({ commentaryEnabled }); persist(snapshot(get)); },
+  setCommentaryVoice: (commentaryVoice) => { set({ commentaryVoice }); persist(snapshot(get)); },
   setCommentaryVolume: (commentaryVolume) => {
     const clamped = Math.max(0, Math.min(1, commentaryVolume));
     set({ commentaryVolume: clamped });

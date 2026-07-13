@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/Button';
 import { useGameStore } from '../store/gameStore';
 import { RotateCcw, Home } from 'lucide-react';
+import { fadeUp, motionTransition, springSmooth, useReducedMotion } from '../ui/motionPresets';
 
 interface MatchPhaseOverlayProps {
   onRematch: () => void;
@@ -16,6 +17,7 @@ function resultLabel(homeScore: number, awayScore: number): string {
 }
 
 export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayProps) {
+  const reduced = useReducedMotion();
   const { phase, homeScore, awayScore, periodCountdown, half } = useGameStore();
 
   const showHalftime = phase === 'halftime';
@@ -42,9 +44,9 @@ export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayPr
       >
         {showFullTime ? (
           <motion.div
-            initial={{ scale: 0.92, y: 16 }}
+            initial={reduced ? false : { scale: 0.92, y: 16 }}
             animate={{ scale: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+            transition={motionTransition(reduced, springSmooth)}
             className="flex min-w-[min(420px,92vw)] flex-col items-center gap-6 rounded-2xl border border-white/15 bg-slate-950/90 px-8 py-10 text-center shadow-2xl backdrop-blur-md"
           >
             <p className="m-0 text-xs font-semibold uppercase tracking-[0.35em] text-amber-300">Full Time</p>
@@ -63,20 +65,32 @@ export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayPr
                   ? 'Home side take the points.'
                   : 'Away side take the points.'}
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button size="lg" onClick={onRematch}>
-                <RotateCcw size={18} /> Rematch
-              </Button>
-              <Button variant="secondary" size="lg" onClick={onMainMenu}>
-                <Home size={18} /> Main Menu
-              </Button>
-            </div>
+            <motion.div
+              initial={reduced ? false : 'hidden'}
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: { transition: { staggerChildren: reduced ? 0 : 0.12, delayChildren: reduced ? 0 : 0.35 } },
+              }}
+              className="flex flex-wrap items-center justify-center gap-3"
+            >
+              <motion.div variants={reduced ? undefined : fadeUp}>
+                <Button size="lg" onClick={onRematch}>
+                  <RotateCcw size={18} /> Rematch
+                </Button>
+              </motion.div>
+              <motion.div variants={reduced ? undefined : fadeUp}>
+                <Button variant="secondary" size="lg" onClick={onMainMenu}>
+                  <Home size={18} /> Main Menu
+                </Button>
+              </motion.div>
+            </motion.div>
           </motion.div>
         ) : (
           <motion.div
-            initial={{ scale: 0.9, y: 12 }}
+            initial={reduced ? false : { scale: 0.9, y: 12 }}
             animate={{ scale: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+            transition={motionTransition(reduced, springSmooth)}
             className="flex min-w-[min(320px,88vw)] flex-col items-center gap-4 rounded-2xl border border-white/15 bg-slate-950/85 px-8 py-9 text-center shadow-2xl backdrop-blur-md"
           >
             <p className="m-0 text-xs font-semibold uppercase tracking-[0.35em] text-white/50">
@@ -92,9 +106,9 @@ export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayPr
             {periodCountdown !== null && periodCountdown > 0 && (
               <motion.span
                 key={periodCountdown}
-                initial={{ scale: 1.4, opacity: 0 }}
+                initial={reduced ? false : { scale: 1.4, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.2 }}
+                transition={motionTransition(reduced, springSmooth)}
                 className="font-mono text-6xl font-black tabular-nums text-white"
               >
                 {periodCountdown}

@@ -13,7 +13,6 @@ import { audioManager } from '../audio/AudioManager';
 import { useGameStore } from '../store/gameStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { commentaryService } from '../audio/CommentaryService';
-import { setMatchDurationSeconds } from '../engine/matchDuration';
 import { useCareerStore } from '../career/careerStore';
 import { displayMatchMinute } from '../utils/matchTime';
 
@@ -54,14 +53,11 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
 
   useEffect(() => {
     careerResultRecorded.current = false;
-    const { devMatchDuration } = useSettingsStore.getState();
-    setMatchDurationSeconds(devMatchDuration);
     tsEngine.init();
     commentaryService.reset();
     const { commentaryEnabled, commentaryVolume, commentaryVoice } = useSettingsStore.getState();
     commentaryService.setEnabled(useGameStore.getState().audioEnabled && commentaryEnabled);
     commentaryService.setVolume(commentaryVolume);
-    commentaryService.setVoice(commentaryVoice);
     useGameStore.getState().resetMatchUi();
     useGameStore.getState().syncMatch(tsEngine.getMatchSnapshot());
 
@@ -81,7 +77,6 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
       const { commentaryEnabled, commentaryVolume, commentaryVoice } = useSettingsStore.getState();
       commentaryService.setEnabled(useGameStore.getState().audioEnabled && commentaryEnabled);
       commentaryService.setVolume(commentaryVolume);
-    commentaryService.setVoice(commentaryVoice);
     });
   }, []);
 
@@ -229,10 +224,9 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
     maybeRecordCareerResult();
     tsEngine.init();
     commentaryService.reset();
-    const { commentaryEnabled, commentaryVolume, commentaryVoice } = useSettingsStore.getState();
+    const { commentaryEnabled, commentaryVolume } = useSettingsStore.getState();
     commentaryService.setEnabled(useGameStore.getState().audioEnabled && commentaryEnabled);
     commentaryService.setVolume(commentaryVolume);
-    commentaryService.setVoice(commentaryVoice);
     useGameStore.getState().resetMatchUi();
     onExit();
   };
