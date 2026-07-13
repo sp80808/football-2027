@@ -27,3 +27,9 @@ Icon?
 
 # IDE-local (runtime state, not shared project config)
 .cursor/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

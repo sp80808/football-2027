@@ -27,6 +27,8 @@ interface GameplayScreenProps {
 }
 
 export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
+  const phase = useGameStore((s) => s.phase);
+  const isMatchEnd = phase === 'full_time';
   const [useWasm, setUseWasm] = useState(false);
   const [replayMode, setReplayMode] = useState(false);
   const replayModeRef = useRef(false);
@@ -34,6 +36,17 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
   const [showOffsideLine, setShowOffsideLine] = useState(true);
   const [isPlayingReplay, setIsPlayingReplay] = useState(false);
   const replayItems = useRef<WorldState[]>([]);
+
+  useEffect(() => {
+    tsEngine.init();
+    useGameStore.getState().resetMatchUi();
+    useGameStore.getState().syncMatch(tsEngine.getMatchSnapshot());
+
+    return () => {
+      tsEngine.init();
+      useGameStore.getState().resetMatchUi();
+    };
+  }, []);
 
   useEffect(() => {
     const unlock = () => {
@@ -155,6 +168,8 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
   };
 
   const handleMainMenu = () => {
+    tsEngine.init();
+    useGameStore.getState().resetMatchUi();
     onExit();
   };
 
@@ -176,17 +191,21 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
         />
       </Suspense>
 
-      <div className="absolute left-3 top-[5.5rem] z-10 flex flex-col gap-2 sm:left-4">
-        <Button variant={replayMode ? 'danger' : 'primary'} onClick={toggleReplay}>
-          {replayMode ? 'Exit Replay' : <><Play size={16} /> Instant Replay</>}
-        </Button>
-      </div>
+      {!isMatchEnd && (
+        <div className="absolute left-3 top-[5.5rem] z-10 flex flex-col gap-2 sm:left-4">
+          <Button variant={replayMode ? 'danger' : 'primary'} onClick={toggleReplay}>
+            {replayMode ? 'Exit Replay' : <><Play size={16} /> Instant Replay</>}
+          </Button>
+        </div>
+      )}
 
-      <div className="absolute right-3 top-3 z-10 sm:right-4">
-        <Button variant="danger" size="sm" onClick={onExit}>
-          <X size={16} /> Exit
-        </Button>
-      </div>
+      {!isMatchEnd && (
+        <div className="absolute right-3 top-3 z-10 sm:right-4">
+          <Button variant="danger" size="sm" onClick={onExit}>
+            <X size={16} /> Exit
+          </Button>
+        </div>
+      )}
 
       <AnimatePresence>
         {replayMode && (

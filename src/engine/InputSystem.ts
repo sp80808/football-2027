@@ -177,6 +177,8 @@ export class InputSystem {
     if (touch.chipHeld) chip = true;
     if (touch.drivenHeld) driven = true;
     if (touch.skillPressed) skill = true;
+    if (touch.tacklePressed) tackle = true;
+    if (touch.slidePressed) slide = true;
 
     this.currentFrame.leftStick.copy(leftStick);
     this.currentFrame.rightStick.copy(rightStick);

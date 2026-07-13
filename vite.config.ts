@@ -33,6 +33,7 @@ export default defineConfig(() => {
       exclude: [
         '**/node_modules/**',
         '**/dist/**',
+        '**/e2e/**',
         '**/.{idea,git,cache,output,temp}/**',
         '**/{karma,rollup,webpack,vite,vitest}.config.*',
         '**/._*',

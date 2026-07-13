@@ -70,6 +70,7 @@ export class Player {
   private readonly scratchToBall = new Vec2();
   private readonly scratchBallVel = new Vec2();
   private readonly scratchToPlayer = new Vec2();
+  private readonly scratchDelta = new Vec2();
 
   update(dt: number, input: ControllerFrame, ball: Ball, opponent?: Opponent) {
     this.tackleWonThisTick = false;
@@ -156,10 +157,10 @@ export class Player {
 
     if (this.tackleTimer <= 0) {
       this.defensiveState = 'none';
-    } else if (isSlide) {
-      this.pos.add(this.vel.clone().mul(dt * 0.85));
     } else {
-      this.pos.add(this.vel.clone().mul(dt));
+      const moveScale = isSlide ? dt * 0.85 : dt;
+      this.scratchDelta.copy(this.vel).mul(moveScale);
+      this.pos.add(this.scratchDelta);
     }
 
     return wonTackle;

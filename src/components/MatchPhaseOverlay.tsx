@@ -9,6 +9,12 @@ interface MatchPhaseOverlayProps {
   onMainMenu: () => void;
 }
 
+function resultLabel(homeScore: number, awayScore: number): string {
+  if (homeScore === awayScore) return 'Draw';
+  if (homeScore > awayScore) return 'Home Win';
+  return 'Away Win';
+}
+
 export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayProps) {
   const { phase, homeScore, awayScore, periodCountdown, half } = useGameStore();
 
@@ -18,6 +24,12 @@ export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayPr
 
   if (!showHalftime && !showKickoff && !showFullTime) return null;
 
+  const pauseTitle = showHalftime
+    ? 'Half Time'
+    : half === 2
+      ? '2nd Half'
+      : 'Kick Off';
+
   return (
     <AnimatePresence>
       <motion.div
@@ -25,15 +37,20 @@ export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayPr
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/55 backdrop-blur-[2px]"
+        transition={{ duration: 0.25 }}
+        className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       >
         {showFullTime ? (
           <motion.div
             initial={{ scale: 0.92, y: 16 }}
             animate={{ scale: 1, y: 0 }}
-            className="flex min-w-[min(420px,92vw)] flex-col items-center gap-6 rounded-2xl border border-white/15 bg-slate-950/90 px-8 py-10 text-center shadow-2xl"
+            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+            className="flex min-w-[min(420px,92vw)] flex-col items-center gap-6 rounded-2xl border border-white/15 bg-slate-950/90 px-8 py-10 text-center shadow-2xl backdrop-blur-md"
           >
             <p className="m-0 text-xs font-semibold uppercase tracking-[0.35em] text-amber-300">Full Time</p>
+            <p className="m-0 text-sm font-semibold uppercase tracking-[0.25em] text-white/45">
+              {resultLabel(homeScore, awayScore)}
+            </p>
             <div className="flex items-center gap-6">
               <span className="font-mono text-5xl font-black tabular-nums text-emerald-300">{homeScore}</span>
               <span className="text-2xl font-light text-white/30">—</span>
@@ -59,10 +76,11 @@ export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayPr
           <motion.div
             initial={{ scale: 0.9, y: 12 }}
             animate={{ scale: 1, y: 0 }}
-            className="flex flex-col items-center gap-3 text-center"
+            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+            className="flex min-w-[min(320px,88vw)] flex-col items-center gap-4 rounded-2xl border border-white/15 bg-slate-950/85 px-8 py-9 text-center shadow-2xl backdrop-blur-md"
           >
             <p className="m-0 text-xs font-semibold uppercase tracking-[0.35em] text-white/50">
-              {showHalftime ? 'Half Time' : half === 2 ? 'Second Half' : 'Kick Off'}
+              {pauseTitle}
             </p>
             {showHalftime && (
               <div className="flex items-center gap-4 font-mono text-3xl font-black tabular-nums">
@@ -76,6 +94,7 @@ export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayPr
                 key={periodCountdown}
                 initial={{ scale: 1.4, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.2 }}
                 className="font-mono text-6xl font-black tabular-nums text-white"
               >
                 {periodCountdown}
