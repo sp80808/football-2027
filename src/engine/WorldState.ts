@@ -1,5 +1,7 @@
 import { Vec2, Vec3 } from './Math';
 import { BallControlState } from './Player';
+import { OpponentState } from './Opponent';
+import { KeeperState } from './Keeper';
 
 export interface PlayerState {
   pos: Vec2;
@@ -16,16 +18,28 @@ export interface BallState {
   vel: Vec3;
 }
 
-export interface KeeperState {
+export interface KeeperWorldState {
   pos: Vec2;
   facing: Vec2;
+  aiState: KeeperState;
+}
+
+export interface OpponentWorldState {
+  pos: Vec2;
+  facing: Vec2;
+  vel: Vec2;
+  aiState: OpponentState;
 }
 
 export interface WorldState {
   tick: number;
   player: PlayerState;
   ball: BallState;
-  keeper: KeeperState;
+  keeper: KeeperWorldState;
+  opponent: OpponentWorldState;
+  scorePlayer: number;
+  scoreOpponent: number;
+  lastGoalScorer: 'player' | 'opponent' | null;
 }
 
 export function createEmptyWorldState(): WorldState {
@@ -38,16 +52,26 @@ export function createEmptyWorldState(): WorldState {
       controlState: 'free',
       isCharging: false,
       chargeStart: 0,
-      chargeType: 'pass'
+      chargeType: 'pass',
     },
     ball: {
       pos: new Vec3(0, 0, 0),
-      vel: new Vec3(0, 0, 0)
+      vel: new Vec3(0, 0, 0),
     },
     keeper: {
       pos: new Vec2(0, 52),
-      facing: new Vec2(0, -1)
-    }
+      facing: new Vec2(0, -1),
+      aiState: 'positioning',
+    },
+    opponent: {
+      pos: new Vec2(0, 25),
+      facing: new Vec2(0, -1),
+      vel: new Vec2(0, 0),
+      aiState: 'tracking',
+    },
+    scorePlayer: 0,
+    scoreOpponent: 0,
+    lastGoalScorer: null,
   };
 }
 
@@ -61,38 +85,50 @@ export function cloneWorldState(state: WorldState): WorldState {
       controlState: state.player.controlState,
       isCharging: state.player.isCharging,
       chargeStart: state.player.chargeStart,
-      chargeType: state.player.chargeType
+      chargeType: state.player.chargeType,
     },
     ball: {
       pos: new Vec3(state.ball.pos.x, state.ball.pos.y, state.ball.pos.z),
-      vel: new Vec3(state.ball.vel.x, state.ball.vel.y, state.ball.vel.z)
+      vel: new Vec3(state.ball.vel.x, state.ball.vel.y, state.ball.vel.z),
     },
     keeper: {
       pos: state.keeper.pos.clone(),
-      facing: state.keeper.facing.clone()
-    }
+      facing: state.keeper.facing.clone(),
+      aiState: state.keeper.aiState,
+    },
+    opponent: {
+      pos: state.opponent.pos.clone(),
+      facing: state.opponent.facing.clone(),
+      vel: state.opponent.vel.clone(),
+      aiState: state.opponent.aiState,
+    },
+    scorePlayer: state.scorePlayer,
+    scoreOpponent: state.scoreOpponent,
+    lastGoalScorer: state.lastGoalScorer,
   };
 }
 
-export function interpolateWorldState(prev: WorldState, next: WorldState, alpha: number): WorldState {
-  const result = cloneWorldState(next); // keep discrete values from next
-  
-  // Interpolate player
-  result.player.pos.x = prev.player.pos.x + (next.player.pos.x - prev.player.pos.x) * alpha;
-  result.player.pos.y = prev.player.pos.y + (next.player.pos.y - prev.player.pos.y) * alpha;
-  
-  result.player.facing.x = prev.player.facing.x + (next.player.facing.x - prev.player.facing.x) * alpha;
-  result.player.facing.y = prev.player.facing.y + (next.player.facing.y - prev.player.facing.y) * alpha;
+export function interpolateWorldState(previous: WorldState, next: WorldState, alpha: number): WorldState {
+  const result = cloneWorldState(next);
+
+  result.player.pos.x = previous.player.pos.x + (next.player.pos.x - previous.player.pos.x) * alpha;
+  result.player.pos.y = previous.player.pos.y + (next.player.pos.y - previous.player.pos.y) * alpha;
+  result.player.facing.x = previous.player.facing.x + (next.player.facing.x - previous.player.facing.x) * alpha;
+  result.player.facing.y = previous.player.facing.y + (next.player.facing.y - previous.player.facing.y) * alpha;
   result.player.facing.normalize();
 
-  // Interpolate ball
-  result.ball.pos.x = prev.ball.pos.x + (next.ball.pos.x - prev.ball.pos.x) * alpha;
-  result.ball.pos.y = prev.ball.pos.y + (next.ball.pos.y - prev.ball.pos.y) * alpha;
-  result.ball.pos.z = prev.ball.pos.z + (next.ball.pos.z - prev.ball.pos.z) * alpha;
+  result.ball.pos.x = previous.ball.pos.x + (next.ball.pos.x - previous.ball.pos.x) * alpha;
+  result.ball.pos.y = previous.ball.pos.y + (next.ball.pos.y - previous.ball.pos.y) * alpha;
+  result.ball.pos.z = previous.ball.pos.z + (next.ball.pos.z - previous.ball.pos.z) * alpha;
 
-  // Interpolate keeper
-  result.keeper.pos.x = prev.keeper.pos.x + (next.keeper.pos.x - prev.keeper.pos.x) * alpha;
-  result.keeper.pos.y = prev.keeper.pos.y + (next.keeper.pos.y - prev.keeper.pos.y) * alpha;
+  result.keeper.pos.x = previous.keeper.pos.x + (next.keeper.pos.x - previous.keeper.pos.x) * alpha;
+  result.keeper.pos.y = previous.keeper.pos.y + (next.keeper.pos.y - previous.keeper.pos.y) * alpha;
+
+  result.opponent.pos.x = previous.opponent.pos.x + (next.opponent.pos.x - previous.opponent.pos.x) * alpha;
+  result.opponent.pos.y = previous.opponent.pos.y + (next.opponent.pos.y - previous.opponent.pos.y) * alpha;
+  result.opponent.facing.x = previous.opponent.facing.x + (next.opponent.facing.x - previous.opponent.facing.x) * alpha;
+  result.opponent.facing.y = previous.opponent.facing.y + (next.opponent.facing.y - previous.opponent.facing.y) * alpha;
+  result.opponent.facing.normalize();
 
   return result;
 }
