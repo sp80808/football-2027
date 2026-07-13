@@ -14,7 +14,8 @@ The integration:
 - caps unusually large render deltas after tab suspension;
 - keeps reusable Three.js vectors to avoid per-frame temporary allocation;
 - uses mode-specific natural frequencies instead of stiffness/damping pairs;
-- leaves all camera motion presentation-only and outside authoritative simulation state.
+- leaves all camera motion presentation-only and outside authoritative simulation state;
+- adds a 30/60/120 Hz equivalence regression for the exact spring primitive.
 
 This is the first live consumer required by issue #27. Keeper, pass and player-switch interception remain follow-up consumers and must refine the analytic solution against acceleration limits and sampled ball trajectories.
 
