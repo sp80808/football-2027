@@ -1,4 +1,12 @@
-import { ControllerFrame, PlayerIntent, PassModifier, ShotModifier, SkillMove, TouchAction, BallAction } from './Intent';
+import {
+  BallAction,
+  ControllerFrame,
+  PassModifier,
+  PlayerIntent,
+  ShotModifier,
+  SkillMove,
+  TouchAction,
+} from './Intent';
 import { Vec2 } from './Math';
 
 export interface IntentParserConfig {
@@ -19,9 +27,8 @@ const DEFAULT_CONFIG: IntentParserConfig = {
 
 /**
  * Converts device-level ControllerFrame data into semantic, gameplay-facing intent.
- *
- * This class is deliberately stateful: charge is accumulated at the fixed simulation
- * timestep, making intent deterministic and independent of browser render frequency.
+ * Charge and held modifiers are accumulated at the fixed simulation timestep so the
+ * result is deterministic and independent of browser render frequency.
  */
 export class IntentParser {
   private readonly config: IntentParserConfig;
@@ -29,6 +36,8 @@ export class IntentParser {
   private readonly faceDir = new Vec2(0, 1);
   private passChargeSeconds = 0;
   private shotChargeSeconds = 0;
+  private activePassModifier: PassModifier = 'none';
+  private activeShotModifier: ShotModifier = 'none';
 
   constructor(config: Partial<IntentParserConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -39,6 +48,8 @@ export class IntentParser {
     this.faceDir.set(0, 1);
     this.passChargeSeconds = 0;
     this.shotChargeSeconds = 0;
+    this.activePassModifier = 'none';
+    this.activeShotModifier = 'none';
   }
 
   parse(frame: ControllerFrame, dt: number): PlayerIntent {
@@ -52,13 +63,19 @@ export class IntentParser {
 
     if (frame.passHeld || frame.throughPassHeld) {
       this.passChargeSeconds += dt;
+      this.activePassModifier = this.getPassModifier(frame);
     }
     if (frame.shootHeld) {
       this.shotChargeSeconds += dt;
+      this.activeShotModifier = this.getShotModifier(frame);
     }
 
-    const passModifier = this.getPassModifier(frame);
-    const shotModifier = this.getShotModifier(frame);
+    const passModifier = frame.passReleased || frame.throughPassReleased
+      ? this.activePassModifier
+      : this.getPassModifier(frame);
+    const shotModifier = frame.shootReleased
+      ? this.activeShotModifier
+      : this.getShotModifier(frame);
     const skillMove = this.getSkillMove(frame);
     const desiredTouch = this.getDesiredTouch(frame, skillMove);
     const action = this.getAction(frame, passModifier);
@@ -72,14 +89,7 @@ export class IntentParser {
             frame.passHeld || frame.throughPassHeld ? this.normaliseCharge(this.passChargeSeconds) : 0,
           );
 
-    if (frame.passReleased || frame.throughPassReleased) {
-      this.passChargeSeconds = 0;
-    }
-    if (frame.shootReleased) {
-      this.shotChargeSeconds = 0;
-    }
-
-    return {
+    const intent: PlayerIntent = {
       moveDir: this.moveDir.clone(),
       faceDir: this.faceDir.clone(),
       urgency: this.getUrgency(frame),
@@ -90,9 +100,21 @@ export class IntentParser {
       skillMove,
       charge,
       isShielding: frame.shield >= this.config.shieldThreshold,
-      cancelRequested: frame.shield >= this.config.shieldThreshold &&
+      cancelRequested:
+        frame.shield >= this.config.shieldThreshold &&
         (frame.passHeld || frame.throughPassHeld || frame.shootHeld),
     };
+
+    if (frame.passReleased || frame.throughPassReleased) {
+      this.passChargeSeconds = 0;
+      this.activePassModifier = 'none';
+    }
+    if (frame.shootReleased) {
+      this.shotChargeSeconds = 0;
+      this.activeShotModifier = 'none';
+    }
+
+    return intent;
   }
 
   private getAction(frame: ControllerFrame, passModifier: PassModifier): BallAction {
@@ -126,7 +148,10 @@ export class IntentParser {
 
   private getSkillMove(frame: ControllerFrame): SkillMove {
     if (!frame.skillPressed) return 'none';
-    if (frame.sprint >= this.config.sprintThreshold && this.moveDir.mag() >= this.config.knockOnThreshold) {
+    if (
+      frame.sprint >= this.config.sprintThreshold &&
+      this.moveDir.mag() >= this.config.knockOnThreshold
+    ) {
       return 'knock_on';
     }
     return this.moveDir.magSq() > 0.1 ? 'step_over' : 'ball_roll';
@@ -134,8 +159,11 @@ export class IntentParser {
 
   private getDesiredTouch(frame: ControllerFrame, skillMove: SkillMove): TouchAction {
     if (frame.shield >= this.config.shieldThreshold) return 'shield';
-    if (skillMove === 'knock_on' ||
-      (frame.sprint >= this.config.sprintThreshold && this.moveDir.mag() >= this.config.knockOnThreshold)) {
+    if (
+      skillMove === 'knock_on' ||
+      (frame.sprint >= this.config.sprintThreshold &&
+        this.moveDir.mag() >= this.config.knockOnThreshold)
+    ) {
       return 'knock_on';
     }
     if (this.moveDir.magSq() < 0.05) return 'cushion';
