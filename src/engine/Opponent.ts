@@ -200,6 +200,23 @@ export class Opponent {
     humanPlayer.controlState = 'free';
   }
 
+  dispossessByPlayer(ball: Ball, humanPlayer: Player): boolean {
+    const cfg = SimulationConfig;
+    const distToBall = this.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y));
+    if (distToBall >= cfg.PLAYER_CONTROL_RADIUS || ball.pos.z >= 1.0) return false;
+
+    const clearAngle = Math.atan2(-this.facing.y, -this.facing.x);
+    const power = cfg.PASS_POWER_BASE * 0.65;
+    ball.vel.x = Math.cos(clearAngle) * power;
+    ball.vel.y = Math.sin(clearAngle) * power;
+    ball.vel.z = 0.4;
+    this.aiState = 'tracking';
+    this.tackleTimer = 0;
+    this.tackleCooldown = 0.8;
+    humanPlayer.controlState = 'free';
+    return true;
+  }
+
   reset() {
     this.pos.set(0, 25);
     this.vel.set(0, 0);

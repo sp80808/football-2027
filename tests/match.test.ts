@@ -47,4 +47,63 @@ describe('MatchManager', () => {
     expect(ball.pos.x).toBe(0);
     expect(player.pos.y).toBe(-5);
   });
+
+  it('enters halftime with countdown then resumes second half', () => {
+    const match = new MatchManager();
+    const ball = new Ball();
+    const player = new Player();
+    const keeper = new Keeper();
+    const cfg = SimulationConfig;
+
+    match.init();
+    match.state.phase = 'playing';
+    match.state.matchTime = cfg.MATCH_DURATION_SECONDS / 2;
+
+    match.update(1 / 120, ball, player, keeper);
+    expect(match.state.phase).toBe('halftime');
+    expect(match.state.periodCountdown).toBeGreaterThan(0);
+
+    for (let i = 0; i < Math.ceil(cfg.HALFTIME_SECONDS * 120) + 5; i++) {
+      match.update(1 / 120, ball, player, keeper);
+      if (match.state.phase === 'kickoff') break;
+    }
+
+    expect(match.state.half).toBe(2);
+    expect(match.state.phase).toBe('kickoff');
+  });
+
+  it('ends match at full time', () => {
+    const match = new MatchManager();
+    const ball = new Ball();
+    const player = new Player();
+    const keeper = new Keeper();
+    const cfg = SimulationConfig;
+
+    match.init();
+    match.state.phase = 'playing';
+    match.state.half = 2;
+    match.state.matchTime = cfg.MATCH_DURATION_SECONDS;
+
+    match.update(1 / 120, ball, player, keeper);
+    expect(match.state.phase).toBe('full_time');
+    expect(match.state.announcement).toBe('FULL TIME');
+  });
+
+  it('rematch resets scores and begins kickoff countdown', () => {
+    const match = new MatchManager();
+    const ball = new Ball();
+    const player = new Player();
+    const keeper = new Keeper();
+
+    match.init();
+    match.state.phase = 'full_time';
+    match.state.homeScore = 2;
+    match.state.awayScore = 1;
+
+    match.rematch();
+    expect(match.state.homeScore).toBe(0);
+    expect(match.state.awayScore).toBe(0);
+    expect(match.state.phase).toBe('kickoff');
+    expect(match.state.periodCountdown).toBeGreaterThan(0);
+  });
 });

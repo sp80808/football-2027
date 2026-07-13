@@ -20,6 +20,8 @@ export interface MatchSnapshot {
   phase: MatchPhase;
   announcement: string | null;
   goalScorer: 'home' | 'away' | null;
+  /** Seconds remaining before play resumes (kickoff or 2nd half). */
+  periodCountdown: number | null;
 }
 
 export class MatchManager {
@@ -31,6 +33,7 @@ export class MatchManager {
     phase: 'pre_kickoff',
     announcement: null,
     goalScorer: null,
+    periodCountdown: null,
   };
 
   private celebrationTimer = 0;
@@ -46,16 +49,23 @@ export class MatchManager {
       phase: 'pre_kickoff',
       announcement: null,
       goalScorer: null,
+      periodCountdown: null,
     };
     this.celebrationTimer = 0;
     this.kickoffTimer = 0;
     this.halftimeTimer = 0;
   }
 
+  rematch() {
+    this.init();
+    this.beginKickoff();
+  }
+
   beginKickoff() {
     this.state.phase = 'kickoff';
     this.state.announcement = 'KICK OFF';
     this.kickoffTimer = SimulationConfig.KICKOFF_DELAY_SECONDS;
+    this.state.periodCountdown = Math.ceil(SimulationConfig.KICKOFF_DELAY_SECONDS);
   }
 
   update(dt: number, ball: Ball, player: Player, keeper: Keeper) {
@@ -63,6 +73,7 @@ export class MatchManager {
 
     if (this.state.phase === 'halftime') {
       this.halftimeTimer -= dt;
+      this.state.periodCountdown = Math.max(0, Math.ceil(this.halftimeTimer));
       if (this.halftimeTimer <= 0) {
         this.state.half = 2;
         this.beginKickoff();
@@ -84,10 +95,12 @@ export class MatchManager {
 
     if (this.state.phase === 'kickoff') {
       this.kickoffTimer -= dt;
+      this.state.periodCountdown = Math.max(0, Math.ceil(this.kickoffTimer));
       if (this.kickoffTimer <= 0) {
         this.state.phase = 'playing';
         this.state.announcement = null;
         this.state.goalScorer = null;
+        this.state.periodCountdown = null;
       }
       return;
     }
@@ -109,12 +122,14 @@ export class MatchManager {
       this.state.phase = 'halftime';
       this.state.announcement = 'HALF TIME';
       this.halftimeTimer = cfg.HALFTIME_SECONDS;
+      this.state.periodCountdown = Math.ceil(cfg.HALFTIME_SECONDS);
       return;
     }
 
     if (this.state.half === 2 && this.state.matchTime >= cfg.MATCH_DURATION_SECONDS) {
       this.state.phase = 'full_time';
       this.state.announcement = 'FULL TIME';
+      this.state.periodCountdown = null;
     }
   }
 

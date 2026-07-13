@@ -21,6 +21,8 @@ interface ParseContext {
   chargeType: 'pass' | 'shoot';
   ballGrounded: boolean;
   ballInControl: boolean;
+  ballReceiving: boolean;
+  incomingBallSpeed: number;
 }
 
 export function resolvePassModifier(frame: ControllerFrame): PassModifier {
@@ -96,7 +98,11 @@ export function parseIntent(frame: ControllerFrame, ctx: ParseContext): PlayerIn
   }
 
   let action: BallAction = 'none';
-  if (frame.shootReleased && ctx.isCharging && ctx.chargeType === 'shoot') {
+  if (ctx.ballReceiving && frame.shootReleased && ctx.isCharging && ctx.chargeType === 'shoot') {
+    action = 'first_time';
+  } else if (ctx.ballReceiving && (frame.passReleased || frame.throughPassReleased) && ctx.isCharging && ctx.chargeType === 'pass') {
+    action = 'first_time';
+  } else if (frame.shootReleased && ctx.isCharging && ctx.chargeType === 'shoot') {
     action = 'shot';
   } else if ((frame.throughPassReleased || frame.passReleased) && ctx.isCharging && ctx.chargeType === 'pass') {
     if (passModifier === 'lob' || passModifier === 'lob_through') action = 'lob_pass';

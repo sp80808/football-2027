@@ -1,6 +1,7 @@
 import { Vec2, Vec3 } from './Math';
 import { ControllerFrame, BallAction, PassModifier, ShotModifier } from './Intent';
 import { Ball } from './Ball';
+import { Opponent } from './Opponent';
 import { SimulationConfig } from './SimulationConfig';
 import { parseIntent } from './PlayerIntentParser';
 
@@ -14,6 +15,8 @@ export type BallControlState =
   | 'shooting_preparation'
   | 'jumping'
   | 'heading';
+
+export type DefensiveState = 'none' | 'tackling' | 'sliding';
 
 export class Player {
   pos = new Vec2(0, 0);
@@ -59,7 +62,21 @@ export class Player {
   isJumping = false;
   jumpTimer = 0;
 
-  update(dt: number, input: ControllerFrame, ball: Ball) {
+  defensiveState: DefensiveState = 'none';
+  tackleWonThisTick = false;
+  private tackleTimer = 0;
+  private tackleCooldown = 0;
+  private readonly scratchBallPos = new Vec2();
+  private readonly scratchToBall = new Vec2();
+  private readonly scratchBallVel = new Vec2();
+  private readonly scratchToPlayer = new Vec2();
+
+  update(dt: number, input: ControllerFrame, ball: Ball, opponent?: Opponent) {
+    this.tackleWonThisTick = false;
+    if (this.tackleCooldown > 0) this.tackleCooldown -= dt;
+    if (this.tackleTimer > 0) this.tackleTimer -= dt;
+
+    const ballReceiving = this.detectBallReceiving(ball);
     const intent = parseIntent(input, {
       playerSpeed: this.vel.mag(),
       chargeDuration: this.chargeStart,
@@ -67,13 +84,92 @@ export class Player {
       chargeType: this.chargeType,
       ballGrounded: ball.pos.z <= 0,
       ballInControl: this.controlState === 'under_control' || this.controlState === 'loose_nearby',
+      ballReceiving,
+      incomingBallSpeed: this.scratchBallVel.mag(),
     });
+
+    if (this.defensiveState !== 'none') {
+      this.tackleWonThisTick = this.updateDefensive(dt, ball, opponent);
+      return;
+    }
+
+    if (opponent && (input.tacklePressed || input.slidePressed) && this.tackleCooldown <= 0) {
+      this.beginTackle(input.slidePressed);
+    }
 
     if (this.skillBurstTimer > 0) this.skillBurstTimer -= dt;
     this.applySkillMove(dt, intent.skillMove, ball);
 
     this.updateLocomotion(dt, intent);
     this.updateBallInteraction(dt, input, intent, ball);
+  }
+
+  private detectBallReceiving(ball: Ball): boolean {
+    if (this.controlState === 'under_control' || this.controlState === 'shielding') return false;
+
+    this.scratchBallPos.set(ball.pos.x, ball.pos.y);
+    this.scratchToPlayer.set(this.pos.x - ball.pos.x, this.pos.y - ball.pos.y);
+    this.scratchBallVel.set(ball.vel.x, ball.vel.y);
+
+    const dist = this.scratchToPlayer.mag();
+    const incomingSpeed = this.scratchBallVel.mag();
+    if (dist > SimulationConfig.PLAYER_CONTROL_RADIUS * 2.5 || incomingSpeed < 1.2) return false;
+
+    this.scratchToPlayer.normalize();
+    this.scratchBallVel.normalize();
+    const approaching = this.scratchToPlayer.dot(this.scratchBallVel) > 0.35;
+    return approaching && ball.pos.z < 1.2;
+  }
+
+  private beginTackle(isSlide: boolean) {
+    const cfg = SimulationConfig;
+    if (isSlide) {
+      this.defensiveState = 'sliding';
+      this.tackleTimer = cfg.SLIDE_DURATION;
+      this.tackleCooldown = cfg.SLIDE_COOLDOWN;
+    } else {
+      this.defensiveState = 'tackling';
+      this.tackleTimer = cfg.TACKLE_DURATION;
+      this.tackleCooldown = cfg.TACKLE_COOLDOWN;
+    }
+  }
+
+  private updateDefensive(dt: number, ball: Ball, opponent?: Opponent): boolean {
+    const cfg = SimulationConfig;
+    const isSlide = this.defensiveState === 'sliding';
+    const range = isSlide ? cfg.SLIDE_RANGE : cfg.TACKLE_RANGE;
+    const speed = isSlide ? cfg.PLAYER_SPRINT_SPEED * 1.35 : cfg.PLAYER_SPRINT_SPEED * 1.15;
+    let wonTackle = false;
+
+    this.scratchToBall.set(ball.pos.x - this.pos.x, ball.pos.y - this.pos.y);
+    if (this.scratchToBall.magSq() > 0.01) {
+      this.scratchToBall.normalize();
+      this.vel.x += this.scratchToBall.x * speed * dt;
+      this.vel.y += this.scratchToBall.y * speed * dt;
+      this.facing.copy(this.scratchToBall);
+    }
+
+    const distToBall = this.pos.distanceTo(this.scratchBallPos.set(ball.pos.x, ball.pos.y));
+    if (opponent && distToBall < range * (isSlide ? 0.75 : 0.6)) {
+      wonTackle = opponent.dispossessByPlayer(ball, this);
+    }
+
+    if (this.tackleTimer <= 0) {
+      this.defensiveState = 'none';
+    } else if (isSlide) {
+      this.pos.add(this.vel.clone().mul(dt * 0.85));
+    } else {
+      this.pos.add(this.vel.clone().mul(dt));
+    }
+
+    return wonTackle;
+  }
+
+  resetDefensive() {
+    this.defensiveState = 'none';
+    this.tackleWonThisTick = false;
+    this.tackleTimer = 0;
+    this.tackleCooldown = 0;
   }
 
   private applySkillMove(dt: number, skill: string, ball: Ball) {
@@ -138,6 +234,8 @@ export class Player {
 
     if (intent.isShielding && distanceToBall < controlRadius) {
       this.controlState = 'shielding';
+    } else if (this.detectBallReceiving(ball) && distanceToBall < controlRadius * 2) {
+      this.controlState = 'receiving';
     } else if (distanceToBall < controlRadius && ball.pos.z < 1) {
       this.controlState = 'under_control';
     } else if (distanceToBall < controlRadius * 2) {
@@ -152,7 +250,18 @@ export class Player {
     const kickAction = this.resolveKickAction(input, intent);
     this.updateCharging(dt, input, kickAction);
 
-    if (kickAction && this.isCharging) {
+    const canFirstTime =
+      kickAction === 'first_time' &&
+      (this.controlState === 'receiving' || this.controlState === 'loose_nearby');
+
+    if (canFirstTime && this.isCharging) {
+      this.executeKick(ball, kickAction, intent);
+      this.isCharging = false;
+      this.chargeStart = 0;
+      this.activePassModifier = 'none';
+      this.activeShotModifier = 'none';
+      this.controlState = 'free';
+    } else if (kickAction && this.isCharging) {
       if (this.controlState === 'under_control' || this.controlState === 'loose_nearby') {
         this.executeKick(ball, kickAction, intent);
       }
@@ -183,6 +292,8 @@ export class Player {
         this.touchTimer = 0;
         this.applyDiscreteTouch(touch, ball, cfg);
       }
+    } else if (this.controlState === 'receiving' && !this.isCharging) {
+      this.applyReceiveTouch(intent.desiredTouch, ball, cfg);
     } else {
       this.touchTimer = 0;
     }
@@ -196,6 +307,7 @@ export class Player {
 
   private resolveKickAction(input: ControllerFrame, intent: ReturnType<typeof parseIntent>): BallAction | null {
     if (!this.isCharging) return null;
+    if (intent.action === 'first_time') return 'first_time';
     if (this.chargeType === 'shoot' && input.shootReleased) return 'shot';
     if (this.chargeType === 'pass' && (input.passReleased || input.throughPassReleased)) {
       return intent.action === 'none' ? 'short_pass' : intent.action;
@@ -232,8 +344,9 @@ export class Player {
     const direction = this.facing.clone();
 
     if (action === 'shot' || action === 'first_time') {
-      const power = cfg.SHOT_POWER_BASE * multiplier;
-      let lift = 3 * multiplier;
+      const powerScale = action === 'first_time' ? 0.75 : 1;
+      const power = cfg.SHOT_POWER_BASE * multiplier * powerScale;
+      let lift = (action === 'first_time' ? 1.6 : 3) * multiplier;
       let spin: Vec3 | undefined;
 
       if (intent.shotModifier === 'finesse') {
@@ -309,5 +422,27 @@ export class Player {
       ball.vel.x *= 1.1;
       ball.vel.y *= 1.1;
     }
+  }
+
+  private applyReceiveTouch(touch: string, ball: Ball, cfg: typeof SimulationConfig) {
+    const incoming = this.scratchBallVel.set(ball.vel.x, ball.vel.y).mag();
+    const idealPosition = this.idealBallPosition(touch);
+    const toIdeal = new Vec2(idealPosition.x - ball.pos.x, idealPosition.y - ball.pos.y);
+    if (toIdeal.magSq() < 0.01) return;
+
+    toIdeal.normalize();
+    if (touch === 'cushion') {
+      const damp = Math.max(0.15, 1 - incoming / 14);
+      ball.vel.x = this.vel.x + toIdeal.x * cfg.TOUCH_FORCE_MAX * 0.35 * damp;
+      ball.vel.y = this.vel.y + toIdeal.y * cfg.TOUCH_FORCE_MAX * 0.35 * damp;
+    } else if (touch === 'knock_on') {
+      ball.vel.x = this.vel.x + this.facing.x * cfg.TOUCH_FORCE_MAX * 1.1;
+      ball.vel.y = this.vel.y + this.facing.y * cfg.TOUCH_FORCE_MAX * 1.1;
+    } else {
+      const force = Math.min(incoming * 0.45, cfg.TOUCH_FORCE_MAX * 0.7);
+      ball.vel.x = this.vel.x + toIdeal.x * force;
+      ball.vel.y = this.vel.y + toIdeal.y * force;
+    }
+    this.controlState = 'under_control';
   }
 }

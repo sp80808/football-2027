@@ -77,6 +77,8 @@ describe('player intent parser', () => {
     chargeType: 'pass' as const,
     ballGrounded: true,
     ballInControl: true,
+    ballReceiving: false,
+    incomingBallSpeed: 0,
   };
 
   it('selects a normal push touch at jogging pace', () => {
@@ -124,6 +126,22 @@ describe('player intent parser', () => {
 
   it('detects through ball modifier', () => {
     expect(parseIntent(makeFrame({ throughPassHeld: true }), context).passModifier).toBe('through');
+  });
+
+  it('emits first-time shot while receiving', () => {
+    const intent = parseIntent(
+      makeFrame({ shootReleased: true }),
+      {
+        ...context,
+        ballInControl: false,
+        ballReceiving: true,
+        incomingBallSpeed: 6,
+        chargeDuration: 0.6,
+        isCharging: true,
+        chargeType: 'shoot',
+      },
+    );
+    expect(intent.action).toBe('first_time');
   });
 });
 

@@ -133,6 +133,7 @@ export class InputSystem {
       driven = !!(this.keys.ShiftLeft || this.keys.ShiftRight);
       skill = !!this.keys.KeyC;
       tackle = !!this.keys.KeyT;
+      slide = !!(this.keys.KeyX || (this.keys.KeyT && (this.keys.ShiftLeft || this.keys.ShiftRight)));
       switchPlayer = !!this.keys.Tab;
       keeperRush = false;
 

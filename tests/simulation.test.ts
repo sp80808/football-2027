@@ -4,10 +4,10 @@ import { GameEngine } from '../src/engine/GameEngine';
 describe('GameEngine Simulation', () => {
   it('should run simulation ticks deterministically', () => {
     const engine1 = new GameEngine();
-    engine1.init();
+    engine1.init({ skipKickoff: true });
 
     const engine2 = new GameEngine();
-    engine2.init();
+    engine2.init({ skipKickoff: true });
 
     // Advance ~1 second using identical, increasing frame timestamps on both
     // engines. (Passing the same timestamp to both would short-circuit the
@@ -29,7 +29,7 @@ describe('GameEngine Simulation', () => {
   it('produces identical results across runs with the same seed', () => {
     const run = () => {
       const engine = new GameEngine();
-      engine.init();
+      engine.init({ skipKickoff: true });
       for (let t = 16; t <= 2000; t += 16) engine.update(t);
       return engine.getRenderState();
     };
@@ -42,7 +42,7 @@ describe('GameEngine Simulation', () => {
 
   it('benchmark: 1000 seconds of simulation', () => {
     const engine = new GameEngine();
-    engine.init();
+    engine.init({ skipKickoff: true });
 
     const start = performance.now();
     for (let i = 0; i < 1000; i++) {
@@ -56,7 +56,7 @@ describe('GameEngine Simulation', () => {
 
   it('computes offside line during simulation', () => {
     const engine = new GameEngine();
-    engine.init();
+    engine.init({ skipKickoff: true });
     for (let t = 16; t <= 200; t += 16) engine.update(t);
     const state = engine.getRenderState();
     expect(state.offsideLineY).not.toBeNull();

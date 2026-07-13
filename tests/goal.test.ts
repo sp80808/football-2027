@@ -45,7 +45,7 @@ describe('MatchState', () => {
 describe('Goal detection integration', () => {
   it('registers goal when ball is in goal mouth past line', () => {
     const engine = new GameEngine();
-    engine.init();
+    engine.init({ skipKickoff: true });
 
     engine.ball.pos.set(0, SimulationConfig.PITCH_HALF_LENGTH + 0.2, 0.5);
     engine.ball.vel.set(0, 0, 0);

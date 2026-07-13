@@ -18,6 +18,7 @@ export type SimEvent =
   | { type: 'goal'; scorer: 'player' | 'opponent' }
   | { type: 'shot'; side: 'player' | 'opponent' }
   | { type: 'offside'; side: 'player' | 'opponent' }
+  | { type: 'tackle'; side: 'player' | 'opponent' }
   | { type: 'whistle' };
 
 export class GameEngine {
@@ -81,11 +82,17 @@ export class GameEngine {
     return events;
   }
 
-  init() {
+  init(options?: { skipKickoff?: boolean }) {
     this.input.init();
     this.matchManager.init();
     this.resetPositions();
-    this.matchManager.state.phase = 'playing';
+    if (options?.skipKickoff) {
+      this.matchManager.state.phase = 'playing';
+      this.matchManager.state.announcement = null;
+      this.matchManager.state.periodCountdown = null;
+    } else {
+      this.matchManager.beginKickoff();
+    }
     this.prevMatchPhase = this.matchManager.state.phase;
     this.prevHomeScore = 0;
     this.prevAwayScore = 0;
@@ -95,6 +102,25 @@ export class GameEngine {
     this.captureState(this.previousState, 0);
     this.captureState(this.currentState, 0);
     this.renderState = cloneWorldState(this.currentState);
+    this.replayBuffer.push(cloneWorldState(this.currentState));
+  }
+
+  rematch() {
+    this.matchManager.rematch();
+    this.resetPositions();
+    this.prevMatchPhase = this.matchManager.state.phase;
+    this.prevHomeScore = 0;
+    this.prevAwayScore = 0;
+    this.scorePlayer = 0;
+    this.scoreOpponent = 0;
+    this.lastGoalScorer = null;
+    this.pendingEvents = [];
+    this.awaitingOffsideCheck = false;
+    this.offsideLineY = null;
+    this.captureState(this.previousState, 0);
+    this.captureState(this.currentState, 0);
+    this.renderState = cloneWorldState(this.currentState);
+    this.replayBuffer.clear();
     this.replayBuffer.push(cloneWorldState(this.currentState));
   }
 
@@ -155,6 +181,12 @@ export class GameEngine {
     } else if (prevPhase === 'goal' && match.phase === 'kickoff') {
       this.resetKickoffExtras();
       this.pendingEvents.push({ type: 'whistle' });
+    } else if (prevPhase === 'playing' && match.phase === 'halftime') {
+      this.pendingEvents.push({ type: 'whistle' });
+    } else if (prevPhase === 'playing' && match.phase === 'full_time') {
+      this.pendingEvents.push({ type: 'whistle' });
+    } else if (prevPhase === 'halftime' && match.phase === 'kickoff') {
+      this.pendingEvents.push({ type: 'whistle' });
     }
 
     this.prevMatchPhase = match.phase;
@@ -182,9 +214,12 @@ export class GameEngine {
       this.player.isCharging &&
       this.player.chargeType === 'shoot';
 
-    this.player.update(this.dt, this.input.currentFrame, this.ball);
+    this.player.update(this.dt, this.input.currentFrame, this.ball, this.opponent);
     this.keeper.update(this.dt, this.ball);
     this.opponent.update(this.dt, this.ball, this.player);
+    if (this.player.tackleWonThisTick) {
+      this.pendingEvents.push({ type: 'tackle', side: 'player' });
+    }
     this.ball.update(this.dt);
 
     this.updateOffsideLine();
@@ -258,6 +293,7 @@ export class GameEngine {
     this.player.controlState = 'free';
     this.player.isCharging = false;
     this.player.chargeStart = 0;
+    this.player.resetDefensive();
     this.awaitingOffsideCheck = false;
     this.previousControlState = 'free';
     this.opponent.reset();
@@ -270,6 +306,7 @@ export class GameEngine {
     this.player.controlState = 'free';
     this.player.isCharging = false;
     this.player.chargeStart = 0;
+    this.player.resetDefensive();
     this.awaitingOffsideCheck = false;
     this.previousControlState = 'free';
 
