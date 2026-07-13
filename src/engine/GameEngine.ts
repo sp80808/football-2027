@@ -9,8 +9,11 @@ import { WorldState, createEmptyWorldState, cloneWorldState, interpolateWorldSta
 import { SeededRandom } from './SeededRandom';
 import { RingBuffer } from './RingBuffer';
 import { OffsideDetector } from './OffsideDetector';
-import { ReplayRecorder } from './ReplayRecorder';
+import { ControllerFrame } from './Intent';
+import { ReplayData, ReplayRecorder } from './ReplayRecorder';
 import { MatchManager, MatchSnapshot } from './MatchManager';
+
+const DEFAULT_SIM_SEED = 12345;
 
 export type SimEvent =
   | { type: 'kick'; power: number }
@@ -27,8 +30,8 @@ export class GameEngine {
   ball = new Ball();
   keeper = new Keeper();
   opponent = new Opponent();
-  random = new SeededRandom(12345);
-  replayRecorder = new ReplayRecorder(12345);
+  random = new SeededRandom(DEFAULT_SIM_SEED);
+  replayRecorder = new ReplayRecorder(DEFAULT_SIM_SEED);
   matchManager = new MatchManager();
 
   private readonly dt = SimulationConfig.DT;
@@ -84,6 +87,8 @@ export class GameEngine {
 
   init(options?: { skipKickoff?: boolean }) {
     this.input.init();
+    this.random.setSeed(DEFAULT_SIM_SEED);
+    this.replayRecorder = new ReplayRecorder(DEFAULT_SIM_SEED, options);
     this.matchManager.init();
     this.resetPositions();
     if (options?.skipKickoff) {
@@ -106,6 +111,8 @@ export class GameEngine {
   }
 
   rematch() {
+    this.random.setSeed(DEFAULT_SIM_SEED);
+    this.replayRecorder = new ReplayRecorder(DEFAULT_SIM_SEED);
     this.matchManager.rematch();
     this.resetPositions();
     this.prevMatchPhase = this.matchManager.state.phase;
@@ -159,7 +166,59 @@ export class GameEngine {
     return this.renderState;
   }
 
-  private tick() {
+  resetForInputReplay(seed: number, options?: { skipKickoff?: boolean }) {
+    this.random.setSeed(seed);
+    this.accumulator = 0;
+    this.lastTime = 0;
+    this.ticksThisSecond = 0;
+    this.lastTpsTime = 0;
+    this.pendingEvents = [];
+    this.matchManager.init();
+    this.resetPositions();
+    if (options?.skipKickoff) {
+      this.matchManager.state.phase = 'playing';
+      this.matchManager.state.announcement = null;
+      this.matchManager.state.periodCountdown = null;
+    } else {
+      this.matchManager.beginKickoff();
+    }
+    this.prevMatchPhase = this.matchManager.state.phase;
+    this.prevHomeScore = 0;
+    this.prevAwayScore = 0;
+    this.scorePlayer = 0;
+    this.scoreOpponent = 0;
+    this.lastGoalScorer = null;
+    this.captureState(this.previousState, 0);
+    this.captureState(this.currentState, 0);
+    this.renderState = cloneWorldState(this.currentState);
+  }
+
+  advanceTickWithInput(input: ControllerFrame): WorldState {
+    this.previousState = cloneWorldState(this.currentState);
+    this.tick(input);
+    const tick = this.previousState.tick + 1;
+    this.captureState(this.currentState, tick);
+    this.renderState = cloneWorldState(this.currentState);
+    return this.renderState;
+  }
+
+  simulateInputReplay(replayData: ReplayData, frameCount?: number): WorldState {
+    this.resetForInputReplay(replayData.seed, { skipKickoff: replayData.skipKickoff });
+    const count = frameCount ?? replayData.frames.length;
+    for (let i = 0; i < count; i++) {
+      this.advanceTickWithInput(replayData.frames[i].input);
+    }
+    return cloneWorldState(this.currentState);
+  }
+
+  buildInputReplayTimeline(replayData?: ReplayData): WorldState[] {
+    const data = replayData ?? this.replayRecorder.getReplayData();
+    const playback = new GameEngine();
+    playback.resetForInputReplay(data.seed, { skipKickoff: data.skipKickoff });
+    return data.frames.map((frame) => playback.advanceTickWithInput(frame.input));
+  }
+
+  private tick(injectedInput?: ControllerFrame) {
     const prevPhase = this.prevMatchPhase;
     const prevHome = this.prevHomeScore;
     const prevAway = this.prevAwayScore;
@@ -195,7 +254,11 @@ export class GameEngine {
 
     if (match.phase !== 'playing') return;
 
-    this.input.update();
+    if (injectedInput) {
+      this.input.injectFrame(injectedInput);
+    } else {
+      this.input.update();
+    }
 
     const passReleased =
       (this.input.currentFrame.passReleased || this.input.currentFrame.throughPassReleased) &&

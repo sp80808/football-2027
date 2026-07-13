@@ -59,6 +59,32 @@ export class InputSystem {
     this.touchOverrides = overrides ?? {};
   }
 
+  injectFrame(input: ControllerFrame) {
+    this.currentFrame.leftStick.copy(input.leftStick);
+    this.currentFrame.rightStick.copy(input.rightStick);
+    this.currentFrame.sprint = input.sprint;
+    this.currentFrame.shield = input.shield;
+    this.currentFrame.passPressed = input.passPressed;
+    this.currentFrame.passHeld = input.passHeld;
+    this.currentFrame.passReleased = input.passReleased;
+    this.currentFrame.throughPassPressed = input.throughPassPressed;
+    this.currentFrame.throughPassHeld = input.throughPassHeld;
+    this.currentFrame.throughPassReleased = input.throughPassReleased;
+    this.currentFrame.shootPressed = input.shootPressed;
+    this.currentFrame.shootHeld = input.shootHeld;
+    this.currentFrame.shootReleased = input.shootReleased;
+    this.currentFrame.lobHeld = input.lobHeld;
+    this.currentFrame.finesseHeld = input.finesseHeld;
+    this.currentFrame.chipHeld = input.chipHeld;
+    this.currentFrame.drivenHeld = input.drivenHeld;
+    this.currentFrame.skillPressed = input.skillPressed;
+    this.currentFrame.lowDrivenTap = input.lowDrivenTap;
+    this.currentFrame.tacklePressed = input.tacklePressed;
+    this.currentFrame.slidePressed = input.slidePressed;
+    this.currentFrame.switchPressed = input.switchPressed;
+    this.currentFrame.keeperRushHeld = input.keeperRushHeld;
+  }
+
   update() {
     const gamepads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
     let gamepad: Gamepad | null = null;

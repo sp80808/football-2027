@@ -32,6 +32,7 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
   const [useWasm, setUseWasm] = useState(false);
   const [replayMode, setReplayMode] = useState(false);
   const replayModeRef = useRef(false);
+  const [replaySource, setReplaySource] = useState<'input' | 'state'>('input');
   const [replayFrame, setReplayFrame] = useState(0);
   const [showOffsideLine, setShowOffsideLine] = useState(true);
   const [isPlayingReplay, setIsPlayingReplay] = useState(false);
@@ -145,7 +146,12 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
 
   const toggleReplay = () => {
     if (!replayMode) {
-      replayItems.current = tsEngine.replayBuffer.getItems();
+      const hasInputFrames = tsEngine.replayRecorder.getFrameCount() > 0;
+      const useInput = hasInputFrames;
+      setReplaySource(useInput ? 'input' : 'state');
+      replayItems.current = useInput
+        ? tsEngine.buildInputReplayTimeline()
+        : tsEngine.replayBuffer.getItems();
       setReplayFrame(Math.max(0, replayItems.current.length - 1));
       setReplayMode(true);
       replayModeRef.current = true;
@@ -155,6 +161,16 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
       replayModeRef.current = false;
       setIsPlayingReplay(false);
     }
+  };
+
+  const switchReplaySource = (source: 'input' | 'state') => {
+    if (source === replaySource) return;
+    setReplaySource(source);
+    replayItems.current = source === 'input'
+      ? tsEngine.buildInputReplayTimeline()
+      : tsEngine.replayBuffer.getItems();
+    setReplayFrame(Math.max(0, replayItems.current.length - 1));
+    setIsPlayingReplay(false);
   };
 
   const replayState = replayMode && replayItems.current.length > 0
@@ -220,7 +236,14 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
                 <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
                 REPLAY MODE
               </h2>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300 transition-colors hover:text-white">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1 rounded-lg border border-slate-600 bg-slate-800 p-0.5 text-xs">
+                  <button type="button" onClick={() => switchReplaySource('input')} disabled={tsEngine.replayRecorder.getFrameCount() === 0}
+                    className={`rounded-md px-2.5 py-1 transition-colors ${replaySource === 'input' ? 'bg-blue-500 text-white' : 'text-slate-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-40'}`}>Input replay</button>
+                  <button type="button" onClick={() => switchReplaySource('state')}
+                    className={`rounded-md px-2.5 py-1 transition-colors ${replaySource === 'state' ? 'bg-blue-500 text-white' : 'text-slate-400 hover:text-white'}`}>State replay</button>
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300 transition-colors hover:text-white">
                 <input
                   type="checkbox"
                   checked={showOffsideLine}
@@ -229,6 +252,7 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
                 />
                 Show Offside Line
               </label>
+              </div>
             </div>
 
             <div className="flex w-full items-center gap-4">
