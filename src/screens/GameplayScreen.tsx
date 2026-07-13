@@ -13,6 +13,8 @@ import { audioManager } from '../audio/AudioManager';
 import { useGameStore } from '../store/gameStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { commentaryService } from '../audio/CommentaryService';
+import { setMatchDurationSeconds } from '../engine/matchDuration';
+import { useCareerStore } from '../career/careerStore';
 import { displayMatchMinute } from '../utils/matchTime';
 
 const RenderingPanel = React.lazy(() =>
@@ -40,13 +42,26 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
   const [showOffsideLine, setShowOffsideLine] = useState(true);
   const [isPlayingReplay, setIsPlayingReplay] = useState(false);
   const replayItems = useRef<WorldState[]>([]);
+  const careerResultRecorded = useRef(false);
+
+  const maybeRecordCareerResult = () => {
+    if (mode !== 'career' || careerResultRecorded.current) return;
+    const match = useGameStore.getState();
+    if (match.phase !== 'full_time') return;
+    careerResultRecorded.current = true;
+    useCareerStore.getState().recordMatchResult(match.homeScore, match.awayScore);
+  };
 
   useEffect(() => {
+    careerResultRecorded.current = false;
+    const { devMatchDuration } = useSettingsStore.getState();
+    setMatchDurationSeconds(devMatchDuration);
     tsEngine.init();
     commentaryService.reset();
-    const { commentaryEnabled, commentaryVolume } = useSettingsStore.getState();
+    const { commentaryEnabled, commentaryVolume, commentaryVoice } = useSettingsStore.getState();
     commentaryService.setEnabled(useGameStore.getState().audioEnabled && commentaryEnabled);
     commentaryService.setVolume(commentaryVolume);
+    commentaryService.setVoice(commentaryVoice);
     useGameStore.getState().resetMatchUi();
     useGameStore.getState().syncMatch(tsEngine.getMatchSnapshot());
 
@@ -58,16 +73,22 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
   }, []);
 
   useEffect(() => {
+    if (phase === 'full_time') maybeRecordCareerResult();
+  }, [phase, mode]);
+
+  useEffect(() => {
     return useSettingsStore.subscribe(() => {
-      const { commentaryEnabled, commentaryVolume } = useSettingsStore.getState();
+      const { commentaryEnabled, commentaryVolume, commentaryVoice } = useSettingsStore.getState();
       commentaryService.setEnabled(useGameStore.getState().audioEnabled && commentaryEnabled);
       commentaryService.setVolume(commentaryVolume);
+    commentaryService.setVoice(commentaryVoice);
     });
   }, []);
 
   useEffect(() => {
     const unlock = () => {
       audioManager.unlock();
+      commentaryService.unlock();
       window.removeEventListener('pointerdown', unlock);
       window.removeEventListener('keydown', unlock);
     };
@@ -197,6 +218,7 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
     : null;
 
   const handleRematch = () => {
+    careerResultRecorded.current = false;
     tsEngine.rematch();
     commentaryService.reset();
     useGameStore.getState().resetMatchUi();
@@ -204,11 +226,13 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
   };
 
   const handleMainMenu = () => {
+    maybeRecordCareerResult();
     tsEngine.init();
     commentaryService.reset();
-    const { commentaryEnabled, commentaryVolume } = useSettingsStore.getState();
+    const { commentaryEnabled, commentaryVolume, commentaryVoice } = useSettingsStore.getState();
     commentaryService.setEnabled(useGameStore.getState().audioEnabled && commentaryEnabled);
     commentaryService.setVolume(commentaryVolume);
+    commentaryService.setVoice(commentaryVoice);
     useGameStore.getState().resetMatchUi();
     onExit();
   };

@@ -228,7 +228,7 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
         <div className="pointer-events-none absolute bottom-28 left-3 select-none sm:bottom-32 sm:left-4">
           <ControlBindingsPanel compact className="min-w-[220px] border-border bg-surface-hud" />
         </div>
-      )
+      )}
 
       <PlayEventFeed side="home" align="left" />
       <PlayEventFeed side="away" align="right" />
