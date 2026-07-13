@@ -1,11 +1,10 @@
 /**
- * Spring-damped broadcast camera with dynamic zoom, steady-cam lag, and decaying shake.
- *
- * FC 26 camera analogue: tele/broadcast wide framing, action-close follow, manual pan deferred.
- * Modes map to FIFA-style presets within our fixed follow rig.
+ * Exact critically damped broadcast camera with dynamic zoom and decaying shake.
+ * Presentation-only: authoritative gameplay state remains in WorldState.
  */
 import * as THREE from 'three';
 import { WorldState } from '../engine/WorldState';
+import { criticallyDampedStep } from '../engine/SimulationMath';
 import type { CameraMode, ZoomIntensity } from '../store/settingsStore';
 
 export interface CameraSettings {
@@ -27,29 +26,45 @@ const MODE_PRESETS: Record<CameraMode, {
   heightSpread: number;
   ballWeight: number;
   focusBlend: number;
-  springStiffness: number;
-  springDamping: number;
+  positionFrequency: number;
+  lookFrequency: number;
   shakeScale: number;
 }> = {
   broadcast: {
     distBase: 24, distSpread: 0.4, distSpeed: 0.14, heightBase: 17, heightSpread: 0.1,
-    ballWeight: 0.35, focusBlend: 0.35, springStiffness: 4.5, springDamping: 0.82, shakeScale: 0.6,
+    ballWeight: 0.35, focusBlend: 0.35, positionFrequency: 4.8, lookFrequency: 4.1, shakeScale: 0.6,
   },
   action: {
     distBase: 17, distSpread: 0.55, distSpeed: 0.18, heightBase: 12, heightSpread: 0.14,
-    ballWeight: 0.65, focusBlend: 0.5, springStiffness: 7, springDamping: 0.75, shakeScale: 1,
+    ballWeight: 0.65, focusBlend: 0.5, positionFrequency: 7.2, lookFrequency: 6.2, shakeScale: 1,
   },
   steady: {
     distBase: 22, distSpread: 0.25, distSpeed: 0.08, heightBase: 15, heightSpread: 0.06,
-    ballWeight: 0.4, focusBlend: 0.3, springStiffness: 3, springDamping: 0.9, shakeScale: 0.25,
+    ballWeight: 0.4, focusBlend: 0.3, positionFrequency: 3.2, lookFrequency: 2.8, shakeScale: 0.25,
   },
   dynamic: {
     distBase: 20, distSpread: 0.35, distSpeed: 0.12, heightBase: 14, heightSpread: 0.08,
-    ballWeight: 0.5, focusBlend: 0.4, springStiffness: 5.5, springDamping: 0.8, shakeScale: 0.85,
+    ballWeight: 0.5, focusBlend: 0.4, positionFrequency: 5.8, lookFrequency: 5, shakeScale: 0.85,
   },
 };
 
 const ZOOM_SCALE: Record<ZoomIntensity, number> = { low: 0.75, medium: 1, high: 1.3 };
+const MAX_RENDER_DT = 0.1;
+const SHAKE_FREQUENCY = 16;
+
+function stepVector(
+  value: THREE.Vector3,
+  velocity: THREE.Vector3,
+  target: THREE.Vector3,
+  frequency: number,
+  dt: number,
+) {
+  const x = criticallyDampedStep(value.x, velocity.x, target.x, frequency, dt);
+  const y = criticallyDampedStep(value.y, velocity.y, target.y, frequency, dt);
+  const z = criticallyDampedStep(value.z, velocity.z, target.z, frequency, dt);
+  value.set(x.value, y.value, z.value);
+  velocity.set(x.velocity, y.velocity, z.velocity);
+}
 
 export class CameraController {
   private posVel = new THREE.Vector3();
@@ -57,6 +72,10 @@ export class CameraController {
   private currentLook = new THREE.Vector3();
   private shakeOffset = new THREE.Vector3();
   private shakeVel = new THREE.Vector3();
+  private shakeTarget = new THREE.Vector3();
+  private targetPos = new THREE.Vector3();
+  private targetLook = new THREE.Vector3();
+  private shakenLook = new THREE.Vector3();
   private shakeDecay = 0;
   private initialised = false;
 
@@ -71,28 +90,18 @@ export class CameraController {
     this.shakeDecay = Math.max(this.shakeDecay, 0.35 + impulse * 0.15);
   }
 
-  update(
-    camera: THREE.PerspectiveCamera,
-    state: WorldState,
-    dt: number,
-    settings: CameraSettings,
-  ) {
+  update(camera: THREE.PerspectiveCamera, state: WorldState, dt: number, settings: CameraSettings) {
+    const safeDt = Number.isFinite(dt) ? THREE.MathUtils.clamp(dt, 0, MAX_RENDER_DT) : 0;
     const preset = MODE_PRESETS[settings.mode];
     const zoom = ZOOM_SCALE[settings.zoomIntensity];
-
     const activePlayer = state.homeTeam[state.activeHomeIndex];
-    const ballSpeed = state.ball.vel.mag();
-    const spread = Math.hypot(
-      activePlayer.pos.x - state.ball.pos.x,
-      activePlayer.pos.y - state.ball.pos.y,
-    );
 
+    const ballSpeed = state.ball.vel.mag();
+    const spread = Math.hypot(activePlayer.pos.x - state.ball.pos.x, activePlayer.pos.y - state.ball.pos.y);
     const ballWeight = preset.ballWeight + (activePlayer.isCharging ? 0.12 : 0);
     const playerWeight = 1 - ballWeight;
-
     const focusX = activePlayer.pos.x * playerWeight + state.ball.pos.x * ballWeight;
     const focusZ = -(activePlayer.pos.y * playerWeight + state.ball.pos.y * ballWeight);
-
     const chargeBoost = activePlayer.isCharging
       ? (activePlayer.chargeStart / 1.2) * (activePlayer.chargeType === 'shoot' ? 0.08 : 0.04)
       : 0;
@@ -108,53 +117,39 @@ export class CameraController {
       22 * zoom,
     );
 
-    const targetPos = new THREE.Vector3(
-      focusX * preset.focusBlend,
-      targetHeight,
-      focusZ + targetDist,
-    );
-    const targetLook = new THREE.Vector3(focusX * 0.42, 0, focusZ);
+    this.targetPos.set(focusX * preset.focusBlend, targetHeight, focusZ + targetDist);
+    this.targetLook.set(focusX * 0.42, 0, focusZ);
 
     if (!this.initialised) {
-      camera.position.copy(targetPos);
-      this.currentLook.copy(targetLook);
+      camera.position.copy(this.targetPos);
+      this.currentLook.copy(this.targetLook);
       this.initialised = true;
     }
 
-    const stiffness = preset.springStiffness;
-    const damping = preset.springDamping;
-    const posAccel = targetPos.clone().sub(camera.position).multiplyScalar(stiffness);
-    this.posVel.add(posAccel.multiplyScalar(dt));
-    this.posVel.multiplyScalar(Math.pow(damping, dt * 60));
-    camera.position.add(this.posVel.clone().multiplyScalar(dt));
+    stepVector(camera.position, this.posVel, this.targetPos, preset.positionFrequency, safeDt);
+    stepVector(this.currentLook, this.lookVel, this.targetLook, preset.lookFrequency, safeDt);
 
-    const lookAccel = targetLook.clone().sub(this.currentLook).multiplyScalar(stiffness * 0.85);
-    this.lookVel.add(lookAccel.multiplyScalar(dt));
-    this.lookVel.multiplyScalar(Math.pow(damping, dt * 60));
-    this.currentLook.add(this.lookVel.clone().multiplyScalar(dt));
-
-    this.updateShake(dt, settings);
-    const shakenLook = this.currentLook.clone().add(this.shakeOffset);
-    camera.position.add(this.shakeOffset.clone().multiplyScalar(0.35));
-    camera.lookAt(shakenLook);
+    this.updateShake(safeDt, settings);
+    this.shakenLook.copy(this.currentLook).add(this.shakeOffset);
+    camera.position.addScaledVector(this.shakeOffset, 0.35);
+    camera.lookAt(this.shakenLook);
   }
 
   private updateShake(dt: number, settings: CameraSettings) {
-    if (!settings.shakeEnabled || this.shakeDecay <= 0) {
+    if (!settings.shakeEnabled) {
       this.shakeOffset.set(0, 0, 0);
       this.shakeVel.set(0, 0, 0);
+      this.shakeDecay = 0;
       return;
     }
-    this.shakeDecay -= dt;
-    const spring = 28;
-    const damp = 0.72;
-    const restore = this.shakeOffset.clone().multiplyScalar(-spring);
-    this.shakeVel.add(restore.multiplyScalar(dt));
-    this.shakeVel.multiplyScalar(Math.pow(damp, dt * 60));
-    this.shakeOffset.add(this.shakeVel.clone().multiplyScalar(dt));
-    if (this.shakeDecay <= 0) {
-      this.shakeOffset.multiplyScalar(0.9);
-      if (this.shakeOffset.lengthSq() < 0.0001) this.shakeOffset.set(0, 0, 0);
+
+    this.shakeDecay = Math.max(0, this.shakeDecay - dt);
+    this.shakeTarget.set(0, 0, 0);
+    stepVector(this.shakeOffset, this.shakeVel, this.shakeTarget, SHAKE_FREQUENCY, dt);
+
+    if (this.shakeDecay === 0 && this.shakeOffset.lengthSq() < 0.0001 && this.shakeVel.lengthSq() < 0.0001) {
+      this.shakeOffset.set(0, 0, 0);
+      this.shakeVel.set(0, 0, 0);
     }
   }
 
@@ -162,8 +157,10 @@ export class CameraController {
     this.initialised = false;
     this.posVel.set(0, 0, 0);
     this.lookVel.set(0, 0, 0);
+    this.currentLook.set(0, 0, 0);
     this.shakeOffset.set(0, 0, 0);
     this.shakeVel.set(0, 0, 0);
+    this.shakeTarget.set(0, 0, 0);
     this.shakeDecay = 0;
   }
 }
