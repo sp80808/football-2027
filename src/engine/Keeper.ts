@@ -12,6 +12,13 @@ export class Keeper {
   private diveTimer = 0;
   private diveVelocity = new Vec2(0, 0);
 
+  resetState() {
+    this.aiState = 'positioning';
+    this.diveTimer = 0;
+    this.diveVelocity.set(0, 0);
+    this.facing.set(0, -1);
+  }
+
   update(dt: number, ball: Ball) {
     if (this.aiState === 'positioning') this.updatePositioning(dt, ball);
     else if (this.aiState === 'diving') this.updateDiving(dt, ball);
