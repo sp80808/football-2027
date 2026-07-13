@@ -1,12 +1,13 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Keeper as KeeperModel } from '../engine/Keeper';
+import { GameEngine } from '../engine/GameEngine';
 
-export function KeeperView({ keeper }: { keeper: KeeperModel }) {
+export function KeeperView({ engine }: { engine: GameEngine }) {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame(() => {
+    const keeper = engine.getRenderState().keeper;
     if (groupRef.current) {
       groupRef.current.position.set(keeper.pos.x, 0.9, -keeper.pos.y);
       const angle = Math.atan2(keeper.facing.y, keeper.facing.x);

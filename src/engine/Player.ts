@@ -1,6 +1,7 @@
 import { Vec2, Vec3 } from './Math';
-import { ControllerFrame } from './InputSystem';
+import { ControllerFrame } from './Intent';
 import { Ball } from './Ball';
+import { SimulationConfig } from './SimulationConfig';
 
 export type BallControlState =
   | 'free'
@@ -18,19 +19,9 @@ export class Player {
   
   controlState: BallControlState = 'free';
   
-  // Actions
-  chargeStart: number = 0; // timestamp or frame counter
+  chargeStart: number = 0;
   isCharging: boolean = false;
   chargeType: 'pass' | 'shoot' = 'pass';
-
-  // Tuning
-  maxSpeed: number = 7.0; // m/s (approx 25 km/h)
-  sprintSpeed: number = 9.0; // m/s (approx 32 km/h)
-  accel: number = 15.0; // m/s^2
-  decel: number = 25.0; // m/s^2
-  turnSpeed: number = 10.0; // radians per second
-  
-  controlRadius: number = 0.5; // distance at which ball is "controllable"
   
   update(dt: number, input: ControllerFrame, ball: Ball) {
     this.updateLocomotion(dt, input);
@@ -38,56 +29,49 @@ export class Player {
   }
 
   private updateLocomotion(dt: number, input: ControllerFrame) {
-    const targetSpeed = input.sprint > 0.5 ? this.sprintSpeed : this.maxSpeed;
+    const targetSpeed = input.sprint > 0.5 ? SimulationConfig.PLAYER_SPRINT_SPEED : SimulationConfig.PLAYER_MAX_SPEED;
     const inputDir = input.leftStick.clone();
     
     // Deceleration if no input
     if (inputDir.magSq() < 0.01) {
       const speed = this.vel.mag();
       if (speed > 0) {
-        const drop = Math.min(speed, this.decel * dt);
+        const drop = Math.min(speed, SimulationConfig.PLAYER_DECEL * dt);
         this.vel.normalize().mul(speed - drop);
       }
     } else {
       // Acceleration
-      const acc = inputDir.normalize().mul(this.accel * dt);
+      const acc = inputDir.normalize().mul(SimulationConfig.PLAYER_ACCEL * dt);
       this.vel.add(acc);
       
-      // Clamp speed
       const speedSq = this.vel.magSq();
       if (speedSq > targetSpeed * targetSpeed) {
         this.vel.normalize().mul(targetSpeed);
       }
 
-      // Update facing smoothly
-      // Right stick can override facing, otherwise follow velocity
+      // Smooth facing update
       let targetFacing = input.rightStick.magSq() > 0.1 ? input.rightStick.clone().normalize() : this.vel.clone().normalize();
       
-      // Slerp or simple interpolation for facing
-      this.facing.x += (targetFacing.x - this.facing.x) * this.turnSpeed * dt;
-      this.facing.y += (targetFacing.y - this.facing.y) * this.turnSpeed * dt;
+      this.facing.x += (targetFacing.x - this.facing.x) * SimulationConfig.PLAYER_TURN_SPEED * dt;
+      this.facing.y += (targetFacing.y - this.facing.y) * SimulationConfig.PLAYER_TURN_SPEED * dt;
       this.facing.normalize();
     }
 
-    // Apply velocity
     this.pos.add(this.vel.clone().mul(dt));
   }
 
   private updateBallInteraction(dt: number, input: ControllerFrame, ball: Ball) {
-    const distToBall = Math.sqrt(
-      Math.pow(ball.pos.x - this.pos.x, 2) + Math.pow(ball.pos.y - this.pos.y, 2)
-    );
+    const distToBall = this.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y));
+    const controlRadius = SimulationConfig.PLAYER_CONTROL_RADIUS;
 
-    // Assess control state
-    if (distToBall < this.controlRadius && ball.pos.z < 1.0) {
+    if (distToBall < controlRadius && ball.pos.z < 1.0) {
       this.controlState = 'under_control';
-    } else if (distToBall < this.controlRadius * 2) {
+    } else if (distToBall < controlRadius * 2) {
       this.controlState = 'loose_nearby';
     } else {
       this.controlState = 'free';
     }
 
-    // Charge action
     if (input.passPressed) {
       this.isCharging = true;
       this.chargeType = 'pass';
@@ -100,20 +84,15 @@ export class Player {
 
     if (this.isCharging) {
       this.chargeStart += dt;
-      // Cap charge
-      if (this.chargeStart > 1.5) this.chargeStart = 1.5;
+      if (this.chargeStart > SimulationConfig.MAX_CHARGE_TIME) this.chargeStart = SimulationConfig.MAX_CHARGE_TIME;
     }
 
-    // Execute kick if released and ball is controllable
     if ((input.passReleased || input.shootReleased) && this.isCharging) {
       if (this.controlState === 'under_control' || this.controlState === 'loose_nearby') {
-        const power = this.chargeType === 'shoot' ? 25 : 12;
-        const multiplier = Math.max(0.2, this.chargeStart / 1.0); // 1.0s = full power
+        const power = this.chargeType === 'shoot' ? SimulationConfig.SHOT_POWER_BASE : SimulationConfig.PASS_POWER_BASE;
+        const multiplier = Math.max(0.2, this.chargeStart / SimulationConfig.MAX_CHARGE_TIME);
         
-        // Kick in facing direction
         const kickDir = this.facing.clone();
-        
-        // Add vertical lift for shots
         const lift = this.chargeType === 'shoot' ? 3.0 * multiplier : 0.5 * multiplier;
         
         ball.kick(new Vec3(
@@ -126,17 +105,32 @@ export class Player {
       this.chargeStart = 0;
     }
 
-    // Soft possession - touch ball to keep it close
+    // Soft possession mechanic
     if (this.controlState === 'under_control' && !this.isCharging) {
-      // Very simple soft possession - nudge ball towards desired velocity
-      const desiredBallVel = this.vel.clone().mul(1.1); // slightly faster than player
-      ball.vel.x += (desiredBallVel.x - ball.vel.x) * 5 * dt;
-      ball.vel.y += (desiredBallVel.y - ball.vel.y) * 5 * dt;
+      const idealDist = 0.4;
+      const playerSpeed = this.vel.mag();
       
-      // Keep it slightly in front of player
-      const idealBallPos = this.pos.clone().add(this.facing.clone().mul(0.3));
-      ball.pos.x += (idealBallPos.x - ball.pos.x) * 10 * dt;
-      ball.pos.y += (idealBallPos.y - ball.pos.y) * 10 * dt;
+      // Calculate ideal ball position slightly in front of the player
+      const idealPos = this.pos.clone().add(this.facing.clone().mul(idealDist));
+      
+      // Calculate vector from current ball pos to ideal pos
+      const toIdeal = new Vec2(idealPos.x - ball.pos.x, idealPos.y - ball.pos.y);
+      const distToIdeal = toIdeal.mag();
+      
+      if (distToIdeal > 0.05) {
+        // Nudge ball towards ideal position
+        toIdeal.normalize();
+        
+        // Touch force scales with distance to ideal pos, but caps out
+        const touchForce = Math.min(distToIdeal * 15, 10);
+        
+        // Add player velocity contribution
+        const desiredBallVelX = this.vel.x + toIdeal.x * touchForce;
+        const desiredBallVelY = this.vel.y + toIdeal.y * touchForce;
+
+        ball.vel.x += (desiredBallVelX - ball.vel.x) * 10 * dt;
+        ball.vel.y += (desiredBallVelY - ball.vel.y) * 10 * dt;
+      }
     }
   }
 }

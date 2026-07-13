@@ -1,22 +1,20 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Player as PlayerModel } from '../engine/Player';
+import { GameEngine } from '../engine/GameEngine';
 
-export function PlayerView({ player }: { player: PlayerModel }) {
+export function PlayerView({ engine }: { engine: GameEngine }) {
   const groupRef = useRef<THREE.Group>(null);
   const indicatorRef = useRef<THREE.Mesh>(null);
 
   useFrame(() => {
+    const player = engine.getRenderState().player;
     if (groupRef.current) {
-      groupRef.current.position.set(player.pos.x, 0.9, -player.pos.y); // Z is up in ThreeJS, y is forward in our 2D engine
-      
-      // Face direction
+      groupRef.current.position.set(player.pos.x, 0.9, -player.pos.y);
       const angle = Math.atan2(player.facing.y, player.facing.x);
       groupRef.current.rotation.y = angle + Math.PI / 2;
     }
     
-    // Charge indicator scaling
     if (indicatorRef.current) {
       if (player.isCharging) {
         indicatorRef.current.visible = true;
@@ -31,19 +29,16 @@ export function PlayerView({ player }: { player: PlayerModel }) {
 
   return (
     <group ref={groupRef}>
-      {/* Player Body */}
       <mesh castShadow receiveShadow>
         <capsuleGeometry args={[0.4, 1.0, 4, 16]} />
         <meshStandardMaterial color="#ffffff" roughness={0.7} />
       </mesh>
       
-      {/* Direction / Charge Indicator */}
       <mesh ref={indicatorRef} position={[0, -0.8, -0.5]} rotation={[Math.PI / 2, 0, 0]} visible={false}>
         <coneGeometry args={[0.3, 1, 8]} />
         <meshStandardMaterial color="#00aaff" />
       </mesh>
       
-      {/* Head to see facing clearly */}
       <mesh position={[0, 0.6, -0.2]} castShadow>
         <boxGeometry args={[0.4, 0.4, 0.4]} />
         <meshStandardMaterial color="#222222" />

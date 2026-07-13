@@ -2,46 +2,80 @@ import { InputSystem } from './InputSystem';
 import { Player } from './Player';
 import { Ball } from './Ball';
 import { Keeper } from './Keeper';
+import { SimulationConfig } from './SimulationConfig';
+import { WorldState, createEmptyWorldState, cloneWorldState, interpolateWorldState } from './WorldState';
+import { SeededRandom } from './SeededRandom';
 
 export class GameEngine {
   input = new InputSystem();
   player = new Player();
   ball = new Ball();
   keeper = new Keeper();
+  random = new SeededRandom(12345);
 
-  // 120 Hz fixed timestep
-  private readonly dt = 1 / 120;
+  private readonly dt = SimulationConfig.DT;
   private accumulator = 0;
   private lastTime = 0;
+  
+  private prevState: WorldState = createEmptyWorldState();
+  private currState: WorldState = createEmptyWorldState();
+  private renderState: WorldState = createEmptyWorldState();
+
+  public tps = 0;
+  private ticksThisSecond = 0;
+  private lastTpsTime = 0;
 
   init() {
     this.input.init();
     
-    // Initial state
     this.player.pos.set(0, -5);
     this.player.vel.set(0, 0);
     this.player.facing.set(0, 1);
     
     this.ball.pos.set(0, 0, 0);
     this.ball.vel.set(0, 0, 0);
+    
+    this.captureState(this.prevState);
+    this.captureState(this.currState);
   }
 
-  update(currentTime: number) {
+  update(currentTime: number): WorldState {
     if (this.lastTime === 0) {
       this.lastTime = currentTime;
-      return;
+      this.lastTpsTime = currentTime;
+      return this.renderState;
     }
 
     const frameTime = (currentTime - this.lastTime) / 1000;
     this.lastTime = currentTime;
 
-    // Prevent spiral of death on long pauses
+    if (currentTime - this.lastTpsTime >= 1000) {
+      this.tps = this.ticksThisSecond;
+      this.ticksThisSecond = 0;
+      this.lastTpsTime = currentTime;
+    }
+
+    // Prevent spiral of death
     this.accumulator += Math.min(frameTime, 0.25);
 
+    let didTick = false;
     while (this.accumulator >= this.dt) {
+      this.prevState = cloneWorldState(this.currState);
       this.tick();
+      this.captureState(this.currState);
       this.accumulator -= this.dt;
+      this.ticksThisSecond++;
+      didTick = true;
     }
+
+    const alpha = this.accumulator / this.dt;
+    this.renderState = interpolateWorldState(this.prevState, this.currState, alpha);
+    
+    return this.renderState;
+  }
+
+  getRenderState() {
+    return this.renderState;
   }
 
   private tick() {
@@ -51,34 +85,49 @@ export class GameEngine {
     this.keeper.update(this.dt, this.ball);
     this.ball.update(this.dt);
     
-    // Pitch boundaries (rough)
     this.enforceBoundaries();
   }
 
+  private captureState(state: WorldState) {
+    state.tick++;
+    state.player.pos.copy(this.player.pos);
+    state.player.vel.copy(this.player.vel);
+    state.player.facing.copy(this.player.facing);
+    state.player.controlState = this.player.controlState;
+    state.player.isCharging = this.player.isCharging;
+    state.player.chargeStart = this.player.chargeStart;
+    state.player.chargeType = this.player.chargeType;
+
+    state.ball.pos.copy(this.ball.pos);
+    state.ball.vel.copy(this.ball.vel);
+
+    state.keeper.pos.copy(this.keeper.pos);
+    state.keeper.facing.copy(this.keeper.facing);
+  }
+
   private enforceBoundaries() {
-    const PITCH_HALF_WIDTH = 34; // 68m wide
-    const PITCH_HALF_LENGTH = 52.5; // 105m long
+    const hw = SimulationConfig.PITCH_HALF_WIDTH;
+    const hl = SimulationConfig.PITCH_HALF_LENGTH;
     
-    if (this.ball.pos.x > PITCH_HALF_WIDTH) {
-      this.ball.pos.x = PITCH_HALF_WIDTH;
+    if (this.ball.pos.x > hw) {
+      this.ball.pos.x = hw;
       this.ball.vel.x *= -0.5;
-    } else if (this.ball.pos.x < -PITCH_HALF_WIDTH) {
-      this.ball.pos.x = -PITCH_HALF_WIDTH;
+    } else if (this.ball.pos.x < -hw) {
+      this.ball.pos.x = -hw;
       this.ball.vel.x *= -0.5;
     }
 
-    if (this.ball.pos.y > PITCH_HALF_LENGTH) {
-      this.ball.pos.y = PITCH_HALF_LENGTH;
+    if (this.ball.pos.y > hl) {
+      this.ball.pos.y = hl;
       this.ball.vel.y *= -0.5;
-    } else if (this.ball.pos.y < -PITCH_HALF_LENGTH) {
-      this.ball.pos.y = -PITCH_HALF_LENGTH;
+    } else if (this.ball.pos.y < -hl) {
+      this.ball.pos.y = -hl;
       this.ball.vel.y *= -0.5;
     }
     
-    // Player bounds
-    if (this.player.pos.x > PITCH_HALF_WIDTH) this.player.pos.x = PITCH_HALF_WIDTH;
-    if (this.player.pos.x < -PITCH_HALF_WIDTH) this.player.pos.x = -PITCH_HALF_WIDTH;
-    if (this.player.pos.y > PITCH_HALF_LENGTH) this.player.pos.y = PITCH_HALF_LENGTH;
-    if (this.player.pos.y < -PITCH_HALF_LENGTH) this.player.pos.y = -PITCH_HALF_LENGTH;
+    if (this.player.pos.x > hw) this.player.pos.x = hw;
+    if (this.player.pos.x < -hw) this.player.pos.x = -hw;
+    if (this.player.pos.y > hl) this.player.pos.y = hl;
+    if (this.player.pos.y < -hl) this.player.pos.y = -hl;
   }
 }
