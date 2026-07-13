@@ -2,6 +2,7 @@ import { InputSystem } from './InputSystem';
 import { Player } from './Player';
 import { Ball } from './Ball';
 import { Keeper } from './Keeper';
+import { Opponent } from './Opponent';
 import { SimulationConfig } from './SimulationConfig';
 import { WorldState, createEmptyWorldState, cloneWorldState, interpolateWorldState } from './WorldState';
 import { SeededRandom } from './SeededRandom';
@@ -12,34 +13,34 @@ export class GameEngine {
   player = new Player();
   ball = new Ball();
   keeper = new Keeper();
+  opponent = new Opponent();
   random = new SeededRandom(12345);
 
   private readonly dt = SimulationConfig.DT;
   private accumulator = 0;
   private lastTime = 0;
-  
-  private prevState: WorldState = createEmptyWorldState();
-  private currState: WorldState = createEmptyWorldState();
+  private previousState: WorldState = createEmptyWorldState();
+  private currentState: WorldState = createEmptyWorldState();
   private renderState: WorldState = createEmptyWorldState();
 
   public tps = 0;
   private ticksThisSecond = 0;
   private lastTpsTime = 0;
-  
-  public replayBuffer = new RingBuffer<WorldState>(600); // 5 seconds at 120Hz
+  public replayBuffer = new RingBuffer<WorldState>(600);
+
+  public scorePlayer = 0;
+  public scoreOpponent = 0;
+  public lastGoalScorer: 'player' | 'opponent' | null = null;
+  private goalPauseTicks = -1;
+  private readonly goalPauseDurationTicks = SimulationConfig.SIMULATION_HZ * 3;
 
   init() {
     this.input.init();
-    
-    this.player.pos.set(0, -5);
-    this.player.vel.set(0, 0);
-    this.player.facing.set(0, 1);
-    
-    this.ball.pos.set(0, 0, 0);
-    this.ball.vel.set(0, 0, 0);
-    
-    this.captureState(this.prevState);
-    this.captureState(this.currState);
+    this.resetPositions();
+    this.captureState(this.previousState, 0);
+    this.captureState(this.currentState, 0);
+    this.renderState = cloneWorldState(this.currentState);
+    this.replayBuffer.push(cloneWorldState(this.currentState));
   }
 
   update(currentTime: number): WorldState {
@@ -58,23 +59,17 @@ export class GameEngine {
       this.lastTpsTime = currentTime;
     }
 
-    // Prevent spiral of death
     this.accumulator += Math.min(frameTime, 0.25);
-
-    let didTick = false;
     while (this.accumulator >= this.dt) {
-      this.prevState = cloneWorldState(this.currState);
+      this.previousState = cloneWorldState(this.currentState);
       this.tick();
-      this.captureState(this.currState);
-      this.replayBuffer.push(cloneWorldState(this.currState));
+      this.captureState(this.currentState, this.previousState.tick + 1);
+      this.replayBuffer.push(cloneWorldState(this.currentState));
       this.accumulator -= this.dt;
       this.ticksThisSecond++;
-      didTick = true;
     }
 
-    const alpha = this.accumulator / this.dt;
-    this.renderState = interpolateWorldState(this.prevState, this.currState, alpha);
-    
+    this.renderState = interpolateWorldState(this.previousState, this.currentState, this.accumulator / this.dt);
     return this.renderState;
   }
 
@@ -83,17 +78,60 @@ export class GameEngine {
   }
 
   private tick() {
+    if (this.goalPauseTicks > 0) {
+      this.goalPauseTicks--;
+      if (this.goalPauseTicks === 0) {
+        this.goalPauseTicks = -1;
+        this.lastGoalScorer = null;
+        this.resetPositions();
+      }
+      return;
+    }
+
     this.input.update();
-    
     this.player.update(this.dt, this.input.currentFrame, this.ball);
     this.keeper.update(this.dt, this.ball);
+    this.opponent.update(this.dt, this.ball, this.player);
     this.ball.update(this.dt);
-    
+    this.checkGoals();
     this.enforceBoundaries();
   }
 
-  private captureState(state: WorldState) {
-    state.tick++;
+  private checkGoals() {
+    const cfg = SimulationConfig;
+    const insideGoal = Math.abs(this.ball.pos.x) <= cfg.GOAL_HALF_WIDTH && this.ball.pos.z <= cfg.GOAL_HEIGHT;
+    if (!insideGoal) return;
+
+    if (this.ball.pos.y >= cfg.PITCH_HALF_LENGTH) {
+      this.scorePlayer++;
+      this.lastGoalScorer = 'player';
+      this.goalPauseTicks = this.goalPauseDurationTicks;
+    } else if (this.ball.pos.y <= -cfg.PITCH_HALF_LENGTH) {
+      this.scoreOpponent++;
+      this.lastGoalScorer = 'opponent';
+      this.goalPauseTicks = this.goalPauseDurationTicks;
+    }
+  }
+
+  private resetPositions() {
+    this.player.pos.set(0, -5);
+    this.player.vel.set(0, 0);
+    this.player.facing.set(0, 1);
+    this.player.controlState = 'free';
+    this.player.isCharging = false;
+    this.player.chargeStart = 0;
+
+    this.ball.pos.set(0, 0, 0);
+    this.ball.vel.set(0, 0, 0);
+
+    this.keeper.pos.set(0, SimulationConfig.PITCH_HALF_LENGTH - 0.5);
+    this.keeper.facing.set(0, -1);
+    this.keeper.aiState = 'positioning';
+    this.opponent.reset();
+  }
+
+  private captureState(state: WorldState, tick: number) {
+    state.tick = tick;
     state.player.pos.copy(this.player.pos);
     state.player.vel.copy(this.player.vel);
     state.player.facing.copy(this.player.facing);
@@ -107,31 +145,41 @@ export class GameEngine {
 
     state.keeper.pos.copy(this.keeper.pos);
     state.keeper.facing.copy(this.keeper.facing);
+    state.keeper.aiState = this.keeper.aiState;
+
+    state.opponent.pos.copy(this.opponent.pos);
+    state.opponent.vel.copy(this.opponent.vel);
+    state.opponent.facing.copy(this.opponent.facing);
+    state.opponent.aiState = this.opponent.aiState;
+
+    state.scorePlayer = this.scorePlayer;
+    state.scoreOpponent = this.scoreOpponent;
+    state.lastGoalScorer = this.lastGoalScorer;
   }
 
   private enforceBoundaries() {
-    const hw = SimulationConfig.PITCH_HALF_WIDTH;
-    const hl = SimulationConfig.PITCH_HALF_LENGTH;
-    
-    if (this.ball.pos.x > hw) {
-      this.ball.pos.x = hw;
-      this.ball.vel.x *= -0.5;
-    } else if (this.ball.pos.x < -hw) {
-      this.ball.pos.x = -hw;
-      this.ball.vel.x *= -0.5;
+    const cfg = SimulationConfig;
+    const inGoalMouth = Math.abs(this.ball.pos.x) <= cfg.GOAL_HALF_WIDTH && this.ball.pos.z <= cfg.GOAL_HEIGHT;
+
+    if (this.ball.pos.x > cfg.PITCH_HALF_WIDTH) {
+      this.ball.pos.x = cfg.PITCH_HALF_WIDTH;
+      this.ball.vel.x *= -0.55;
+    } else if (this.ball.pos.x < -cfg.PITCH_HALF_WIDTH) {
+      this.ball.pos.x = -cfg.PITCH_HALF_WIDTH;
+      this.ball.vel.x *= -0.55;
     }
 
-    if (this.ball.pos.y > hl) {
-      this.ball.pos.y = hl;
-      this.ball.vel.y *= -0.5;
-    } else if (this.ball.pos.y < -hl) {
-      this.ball.pos.y = -hl;
-      this.ball.vel.y *= -0.5;
+    if (!inGoalMouth) {
+      if (this.ball.pos.y > cfg.PITCH_HALF_LENGTH) {
+        this.ball.pos.y = cfg.PITCH_HALF_LENGTH;
+        this.ball.vel.y *= -0.55;
+      } else if (this.ball.pos.y < -cfg.PITCH_HALF_LENGTH) {
+        this.ball.pos.y = -cfg.PITCH_HALF_LENGTH;
+        this.ball.vel.y *= -0.55;
+      }
     }
-    
-    if (this.player.pos.x > hw) this.player.pos.x = hw;
-    if (this.player.pos.x < -hw) this.player.pos.x = -hw;
-    if (this.player.pos.y > hl) this.player.pos.y = hl;
-    if (this.player.pos.y < -hl) this.player.pos.y = -hl;
+
+    this.player.pos.x = Math.max(-cfg.PITCH_HALF_WIDTH, Math.min(cfg.PITCH_HALF_WIDTH, this.player.pos.x));
+    this.player.pos.y = Math.max(-cfg.PITCH_HALF_LENGTH, Math.min(cfg.PITCH_HALF_LENGTH, this.player.pos.y));
   }
 }
