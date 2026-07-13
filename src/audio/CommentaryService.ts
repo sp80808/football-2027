@@ -1,11 +1,11 @@
 import type { SimEvent } from '../engine/GameEngine';
 import type { MatchSnapshot } from '../engine/MatchManager';
-import type { Player } from '../engine/Player';
+import type { Footballer } from '../engine/Footballer';
 import type { CommentaryVoiceId } from './commentaryTtsConfig';
 import { commentaryEngine } from './CommentaryEngine';
 import { commentaryTTS } from './CommentaryTTS';
 
-function inferPossession(player: Player): 'home' | 'away' | 'loose' {
+function inferPossession(player: Footballer): 'home' | 'away' | 'loose' {
   const state = player.controlState;
   if (state === 'under_control' || state === 'shielding' || state === 'receiving') return 'home';
   return 'loose';
@@ -18,7 +18,7 @@ export class CommentaryService {
   setVoice(voiceId: CommentaryVoiceId) { commentaryTTS.setVoice(voiceId); }
   unlock() { commentaryTTS.unlock(); }
 
-  update(events: SimEvent[], snapshot: MatchSnapshot, player: Player) {
+  update(events: SimEvent[], snapshot: MatchSnapshot, player: Footballer) {
     for (const event of events) {
       if (event.type === 'shot') {
         commentaryTTS.prefetch("He's through!");

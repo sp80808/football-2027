@@ -1,6 +1,6 @@
 import { Vec2 } from './Math';
 import { Ball } from './Ball';
-import { Player } from './Player';
+import { Footballer } from './Footballer';
 import { SimulationConfig } from './SimulationConfig';
 
 export type OffsideCheckResult = {

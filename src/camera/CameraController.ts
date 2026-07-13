@@ -99,8 +99,8 @@ export class CameraController {
 
     const targetDist = THREE.MathUtils.clamp(
       (preset.distBase + spread * preset.distSpread + ballSpeed * preset.distSpeed - chargeBoost * 8) * zoom,
-      preset.distMin * zoom,
-      preset.distMax * zoom,
+      10 * zoom,
+      35 * zoom,
     );
     const targetHeight = THREE.MathUtils.clamp(
       (preset.heightBase + spread * preset.heightSpread + chargeBoost * 3) * zoom,

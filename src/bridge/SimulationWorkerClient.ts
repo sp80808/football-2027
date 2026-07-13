@@ -26,25 +26,25 @@ export class SimulationWorkerClient {
 
   getRenderState(): WorldState {
     this.renderState.tick++;
-    this.renderState.player.pos.set(this.stateBuffer[0], this.stateBuffer[1]);
-    this.renderState.player.vel.set(0, 0);
-    this.renderState.player.facing.set(0, 1);
-    this.renderState.player.controlState = 'free';
-    this.renderState.player.isCharging = false;
-    this.renderState.player.chargeStart = 0;
-    this.renderState.player.chargeType = 'pass';
+    this.renderState.homeTeam[0].pos.set(this.stateBuffer[0], this.stateBuffer[1]);
+    this.renderState.homeTeam[0].vel.set(0, 0);
+    this.renderState.homeTeam[0].facing.set(0, 1);
+    this.renderState.homeTeam[0].controlState = 'free';
+    this.renderState.homeTeam[0].isCharging = false;
+    this.renderState.homeTeam[0].chargeStart = 0;
+    this.renderState.homeTeam[0].chargeType = 'pass';
 
     this.renderState.ball.pos.set(this.stateBuffer[2], this.stateBuffer[3], this.stateBuffer[4]);
     this.renderState.ball.vel.set(0, 0, 0);
 
-    this.renderState.keeper.pos.set(0, 52);
-    this.renderState.keeper.facing.set(0, -1);
-    this.renderState.keeper.aiState = 'positioning';
+    this.renderState.homeKeeper.pos.set(0, 52);
+    this.renderState.homeKeeper.facing.set(0, -1);
+    this.renderState.homeKeeper.aiState = 'positioning';
 
-    this.renderState.opponent.pos.set(0, 25);
-    this.renderState.opponent.vel.set(0, 0);
-    this.renderState.opponent.facing.set(0, -1);
-    this.renderState.opponent.aiState = 'tracking';
+    this.renderState.awayTeam[0].pos.set(0, 25);
+    this.renderState.awayTeam[0].vel.set(0, 0);
+    this.renderState.awayTeam[0].facing.set(0, -1);
+    
     this.renderState.scorePlayer = 0;
     this.renderState.scoreOpponent = 0;
     this.renderState.lastGoalScorer = null;

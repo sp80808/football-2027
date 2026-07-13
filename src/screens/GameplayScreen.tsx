@@ -76,10 +76,10 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
       const controlled = useSquadStore.getState().getControlled();
       if (!controlled) return;
       const b = bindingsForProfile(controlled);
-      tsEngine.player.speedMul = b.speedMul;
-      tsEngine.player.accelMul = b.accelMul;
-      tsEngine.player.controlMul = b.controlMul;
-      tsEngine.player.kickPowerMul = b.kickPowerMul;
+      for(let p of tsEngine.homeTeam) p.speedMul = b.speedMul;
+      for(let p of tsEngine.homeTeam) p.accelMul = b.accelMul;
+      for(let p of tsEngine.homeTeam) p.controlMul = b.controlMul;
+      for(let p of tsEngine.homeTeam) p.kickPowerMul = b.kickPowerMul;
     };
     apply();
     return useSquadStore.subscribe(apply);
@@ -124,7 +124,7 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
         // RPG: feed the on-pitch action tracker (only in career mode where a squad exists).
         if (mode === 'career') {
           const tracker = useSquadStore.getState().tracker;
-          const playerHasBall = tsEngine.player.controlState === 'under_control' || tsEngine.player.controlState === 'shielding';
+          const playerHasBall = tsEngine.homeTeam[tsEngine.activeHomeIndex].controlState === 'under_control' || tsEngine.homeTeam[tsEngine.activeHomeIndex].controlState === 'shielding';
           tracker.observeTick(snapshot.matchTime, playerHasBall);
           // Player-switch (Tab / LB) cycles which squad member is controlled.
           if (tsEngine.input.currentFrame.switchPressed) {
@@ -134,7 +134,7 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
 
         const frameEvents = tsEngine.drainEvents();
         if (mode === 'career') useSquadStore.getState().tracker.ingestSimEvents(frameEvents);
-        commentaryService.update(frameEvents, snapshot, tsEngine.player);
+        commentaryService.update(frameEvents, snapshot, tsEngine.homeTeam[tsEngine.activeHomeIndex]);
         for (const event of frameEvents) {
           const state = tsEngine.getRenderState();
           const ballX = state.ball.pos.x;

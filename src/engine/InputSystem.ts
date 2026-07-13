@@ -152,52 +152,52 @@ export class InputSystem {
       const rsMag = rightStick.mag();
       skill = rsMag > 0.85;
       keeperRush = gamepad.buttons[10]?.pressed || false;
-    } else {
-      if (this.keys.ArrowUp || this.keys.KeyW) leftStick.y += 1;
-      if (this.keys.ArrowDown || this.keys.KeyS) leftStick.y -= 1;
-      if (this.keys.ArrowLeft || this.keys.KeyA) leftStick.x -= 1;
-      if (this.keys.ArrowRight || this.keys.KeyD) leftStick.x += 1;
-      if (leftStick.magSq() > 1) leftStick.normalize();
+    }
 
-      if (this.keys.ShiftLeft || this.keys.ShiftRight) sprint = 1;
-      if (this.keys.ControlLeft || this.keys.ControlRight) shield = 1;
-      pass = !!(this.keys.KeyF || this.keys.Space);
-      shoot = !!(this.keys.KeyG || this.keys.Enter);
-      throughPass = !!this.keys.KeyR;
-      lob = !!this.keys.KeyE;
-      finesse = !!this.keys.KeyQ;
-      chip = !!(this.keys.AltLeft || this.keys.AltRight);
-      driven = !!(this.keys.ShiftLeft || this.keys.ShiftRight);
-      skill = !!this.keys.KeyC;
-      tackle = !!this.keys.KeyT;
-      slide = !!(this.keys.KeyX || (this.keys.KeyT && (this.keys.ShiftLeft || this.keys.ShiftRight)));
-      switchPlayer = !!this.keys.Tab;
-      keeperRush = !!this.keys.KeyV;
+    if (this.keys.ArrowUp || this.keys.KeyW) leftStick.y += 1;
+    if (this.keys.ArrowDown || this.keys.KeyS) leftStick.y -= 1;
+    if (this.keys.ArrowLeft || this.keys.KeyA) leftStick.x -= 1;
+    if (this.keys.ArrowRight || this.keys.KeyD) leftStick.x += 1;
+    if (leftStick.magSq() > 1) leftStick.normalize();
 
-      if (shoot && !this.prevShoot) {
-        if (this.shootCharging && performance.now() - this.lastShootPressTime < 350) {
-          lowDrivenTap = true;
-          this.lowDrivenLatched = true;
-        }
-        this.lastShootPressTime = performance.now();
-        this.shootCharging = true;
+    if (this.keys.ShiftLeft || this.keys.ShiftRight) sprint = 1;
+    if (this.keys.ControlLeft || this.keys.ControlRight) shield = 1;
+    pass = pass || !!(this.keys.KeyF || this.keys.Space);
+    shoot = shoot || !!(this.keys.KeyG || this.keys.Enter);
+    throughPass = throughPass || !!this.keys.KeyR;
+    lob = lob || !!this.keys.KeyE;
+    finesse = finesse || !!this.keys.KeyQ;
+    chip = chip || !!(this.keys.AltLeft || this.keys.AltRight);
+    driven = driven || !!(this.keys.ShiftLeft || this.keys.ShiftRight);
+    skill = skill || !!this.keys.KeyC;
+    tackle = tackle || !!this.keys.KeyT;
+    slide = slide || !!(this.keys.KeyX || (this.keys.KeyT && (this.keys.ShiftLeft || this.keys.ShiftRight)));
+    switchPlayer = switchPlayer || !!this.keys.Tab;
+    keeperRush = keeperRush || !!this.keys.KeyV;
+
+    if (shoot && !this.prevShoot) {
+      if (this.shootCharging && performance.now() - this.lastShootPressTime < 350) {
+        lowDrivenTap = true;
+        this.lowDrivenLatched = true;
       }
-      if (!shoot) {
-        this.shootCharging = false;
-      }
-      if (this.lowDrivenLatched) lowDrivenTap = true;
-      if (!shoot && this.prevShoot) this.lowDrivenLatched = false;
+      this.lastShootPressTime = performance.now();
+      this.shootCharging = true;
+    }
+    if (!shoot) {
+      this.shootCharging = false;
+    }
+    if (this.lowDrivenLatched) lowDrivenTap = true;
+    if (!shoot && this.prevShoot) this.lowDrivenLatched = false;
 
-      if (leftStick.magSq() > 0.5) {
-        const now = performance.now();
-        const sameDir = this.lastStickDir.dot(leftStick) > 0.85 && leftStick.magSq() > 0.5;
-        if (sameDir && now - this.lastStickTapTime < 280) {
-          skill = true;
-          this.lastStickTapTime = 0;
-        } else if (!sameDir || now - this.lastStickTapTime > 280) {
-          this.lastStickDir.copy(leftStick);
-          this.lastStickTapTime = now;
-        }
+    if (leftStick.magSq() > 0.5) {
+      const now = performance.now();
+      const sameDir = this.lastStickDir.dot(leftStick) > 0.85 && leftStick.magSq() > 0.5;
+      if (sameDir && now - this.lastStickTapTime < 280) {
+        skill = true;
+        this.lastStickTapTime = 0;
+      } else if (!sameDir || now - this.lastStickTapTime > 280) {
+        this.lastStickDir.copy(leftStick);
+        this.lastStickTapTime = now;
       }
     }
 

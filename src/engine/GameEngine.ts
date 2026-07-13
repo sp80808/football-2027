@@ -305,7 +305,7 @@ export class GameEngine {
       let bestIdx = this.activeHomeIndex;
       for(let i=0; i<10; i++) {
         if(i === this.activeHomeIndex) continue;
-        const dist = this.homeTeam[i].pos.distanceTo(this.ball.pos);
+        const dist = Math.hypot(this.homeTeam[i].pos.x - this.ball.pos.x, this.homeTeam[i].pos.y - this.ball.pos.y);
         if(dist < bestDist) {
           bestDist = dist;
           bestIdx = i;

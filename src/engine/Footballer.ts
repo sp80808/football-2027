@@ -1,7 +1,7 @@
 import { Vec2, Vec3 } from './Math';
 import { ControllerFrame, BallAction, PassModifier, ShotModifier } from './Intent';
 import { Ball } from './Ball';
-import { Opponent } from './Opponent';
+
 import { SimulationConfig } from './SimulationConfig';
 import { parseIntent } from './PlayerIntentParser';
 
@@ -90,7 +90,7 @@ export class Footballer {
   private readonly scratchToPlayer = new Vec2();
   private readonly scratchDelta = new Vec2();
 
-  update(dt: number, input: ControllerFrame, ball: Ball, opponent?: Opponent) {
+  update(dt: number, input: ControllerFrame, ball: Ball, opponent?: Footballer) {
     this.tackleWonThisTick = false;
     if (this.tackleCooldown > 0) this.tackleCooldown -= dt;
     if (this.tackleTimer > 0) this.tackleTimer -= dt;
@@ -154,7 +154,7 @@ export class Footballer {
     }
   }
 
-  private updateDefensive(dt: number, ball: Ball, opponent?: Opponent): boolean {
+  private updateDefensive(dt: number, ball: Ball, opponent?: Footballer): boolean {
     const cfg = SimulationConfig;
     const isSlide = this.defensiveState === 'sliding';
     const range = isSlide ? cfg.SLIDE_RANGE : cfg.TACKLE_RANGE;
@@ -171,9 +171,12 @@ export class Footballer {
 
     const distToBall = this.pos.distanceTo(this.scratchBallPos.set(ball.pos.x, ball.pos.y));
     if (opponent && distToBall < range * (isSlide ? 0.75 : 0.6)) {
-      wonTackle = opponent.dispossessByPlayer(ball, this);
+      if (opponent.controlState === 'under_control' || opponent.controlState === 'shielding') {
+        opponent.controlState = 'free';
+        opponent.isCharging = false;
+        wonTackle = true;
+      }
     }
-
     if (this.tackleTimer <= 0) {
       this.defensiveState = 'none';
     } else {
@@ -253,7 +256,7 @@ export class Footballer {
     input: ControllerFrame,
     intent: ReturnType<typeof parseIntent>,
     ball: Ball,
-    opponent?: Opponent,
+    opponent?: Footballer,
   ) {
     const cfg = SimulationConfig;
     const distanceToBall = this.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y));
@@ -367,7 +370,7 @@ export class Footballer {
     }
   }
 
-  private executeKick(ball: Ball, action: BallAction, intent: ReturnType<typeof parseIntent>, opponent?: Opponent) {
+  private executeKick(ball: Ball, action: BallAction, intent: ReturnType<typeof parseIntent>, opponent?: Footballer) {
     const cfg = SimulationConfig;
     const multiplier = Math.max(cfg.MIN_CHARGE_FRACTION, this.chargeStart / cfg.MAX_CHARGE_TIME);
     const direction = this.facing.clone();

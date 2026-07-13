@@ -675,8 +675,8 @@ export function RenderingPanel({
           zoomIntensity: settings.zoomIntensity,
         });
 
-        const lookX = state.player.pos.x * 0.42;
-        const lookZ = -(state.player.pos.y * 0.58 + state.ball.pos.y * 0.42);
+        const lookX = state.homeTeam[state.activeHomeIndex].pos.x * 0.42;
+        const lookZ = -(state.homeTeam[state.activeHomeIndex].pos.y * 0.58 + state.ball.pos.y * 0.42);
         audioManager.updateListener(
           camera.position.x,
           camera.position.y,
