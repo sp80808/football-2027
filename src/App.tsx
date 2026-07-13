@@ -2,18 +2,38 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SplashScreen } from './screens/SplashScreen';
 import { MainMenuScreen } from './screens/MainMenuScreen';
 import { QuickMatchScreen } from './screens/QuickMatchScreen';
 import { CareerScreen } from './screens/CareerScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { GameplayScreen } from './screens/GameplayScreen';
+import { useGameStore } from './store/gameStore';
 
 type Screen = 'splash' | 'mainMenu' | 'quickMatch' | 'career' | 'settings' | 'gameplay';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('splash');
+
+  useEffect(() => {
+    const syncTestSeam = () => {
+      const match = useGameStore.getState();
+      window.__TEST__ = {
+        screen,
+        phase: match.phase,
+        homeScore: match.homeScore,
+        awayScore: match.awayScore,
+      };
+    };
+
+    syncTestSeam();
+    const unsubscribe = useGameStore.subscribe(syncTestSeam);
+    return () => {
+      unsubscribe();
+      delete window.__TEST__;
+    };
+  }, [screen]);
 
   switch (screen) {
     case 'splash':
