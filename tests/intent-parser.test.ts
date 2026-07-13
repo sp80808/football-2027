@@ -76,7 +76,7 @@ describe('IntentParser', () => {
     );
 
     expect(intent.action).toBe('lob_pass');
-    expect(intent.passModifier).toBe('lob');
+    expect(intent.passModifier).toBe('lob_through');
   });
 
   it('prioritises shielding and requests cancellation while charging', () => {
