@@ -1,27 +1,18 @@
 import { ControllerFrame } from '../engine/Intent';
-import { WorldState } from '../engine/WorldState';
-import { SimulationConfig } from '../engine/SimulationConfig';
+import { WorldState, createEmptyWorldState } from '../engine/WorldState';
 
 export class SimulationWorkerClient {
   private worker: Worker;
-  private stateBuffer: Float32Array;
-  
+  private stateBuffer = new Float32Array(5);
+  private renderState: WorldState = createEmptyWorldState();
+
   constructor() {
-    this.worker = new Worker(new URL('./simulation.worker.ts', import.meta.url), {
-      type: 'module'
-    });
-    
-    // For now we use standard messaging or SharedArrayBuffer if available.
-    // 5 floats: playerX, playerY, ballX, ballY, ballZ
-    this.stateBuffer = new Float32Array(5);
-    
-    this.worker.onmessage = (e) => {
-      if (e.data.type === 'STATE_UPDATE') {
-        this.stateBuffer.set(e.data.state);
-      }
+    this.worker = new Worker(new URL('./simulation.worker.ts', import.meta.url), { type: 'module' });
+    this.worker.onmessage = (event) => {
+      if (event.data.type === 'STATE_UPDATE') this.stateBuffer.set(event.data.state);
     };
   }
-  
+
   init() {
     this.worker.postMessage({ type: 'INIT' });
   }
@@ -29,35 +20,35 @@ export class SimulationWorkerClient {
   submitInput(input: ControllerFrame) {
     this.worker.postMessage({
       type: 'INPUT',
-      input: {
-        x: input.leftStick.x,
-        y: input.leftStick.y
-      }
+      input: { x: input.leftStick.x, y: input.leftStick.y },
     });
   }
 
   getRenderState(): WorldState {
-    // This maps the flat Float32Array back to the expected WorldState structure
-    // Since we're in a transition phase, we will return a minimal mocked WorldState
-    return {
-      tick: 0,
-      player: {
-        pos: { x: this.stateBuffer[0], y: this.stateBuffer[1], clone: () => ({ x: this.stateBuffer[0], y: this.stateBuffer[1] } as any) } as any,
-        vel: { x: 0, y: 0, mag: () => 0, clone: () => ({ x: 0, y: 0 } as any) } as any,
-        facing: { x: 0, y: 1, clone: () => ({ x: 0, y: 1 } as any) } as any,
-        controlState: 'free',
-        isCharging: false,
-        chargeStart: 0,
-        chargeType: 'pass'
-      },
-      ball: {
-        pos: { x: this.stateBuffer[2], y: this.stateBuffer[3], z: this.stateBuffer[4] } as any,
-        vel: { x: 0, y: 0, z: 0, mag: () => 0, clone: () => ({ x: 0, y: 0, z: 0 } as any) } as any
-      },
-      keeper: {
-        pos: { x: 0, y: 52, clone: () => ({ x: 0, y: 52 } as any) } as any,
-        facing: { x: 0, y: -1, clone: () => ({ x: 0, y: -1 } as any) } as any
-      }
-    };
+    this.renderState.tick++;
+    this.renderState.player.pos.set(this.stateBuffer[0], this.stateBuffer[1]);
+    this.renderState.player.vel.set(0, 0);
+    this.renderState.player.facing.set(0, 1);
+    this.renderState.player.controlState = 'free';
+    this.renderState.player.isCharging = false;
+    this.renderState.player.chargeStart = 0;
+    this.renderState.player.chargeType = 'pass';
+
+    this.renderState.ball.pos.set(this.stateBuffer[2], this.stateBuffer[3], this.stateBuffer[4]);
+    this.renderState.ball.vel.set(0, 0, 0);
+
+    this.renderState.keeper.pos.set(0, 52);
+    this.renderState.keeper.facing.set(0, -1);
+    this.renderState.keeper.aiState = 'positioning';
+
+    this.renderState.opponent.pos.set(0, 25);
+    this.renderState.opponent.vel.set(0, 0);
+    this.renderState.opponent.facing.set(0, -1);
+    this.renderState.opponent.aiState = 'tracking';
+    this.renderState.scorePlayer = 0;
+    this.renderState.scoreOpponent = 0;
+    this.renderState.lastGoalScorer = null;
+
+    return this.renderState;
   }
 }
