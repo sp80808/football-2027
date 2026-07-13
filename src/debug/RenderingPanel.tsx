@@ -187,7 +187,7 @@ export function RenderingPanel({ useWasm, engine, wasmClient }: RenderingPanelPr
   return (
     <>
       <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
-      <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: '10px' }}>
+      <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', padding: '10px', zIndex: 10 }}>
         Renderer: {rendererType} <br/>
         Sim: {useWasm ? 'WASM Worker' : 'TypeScript Main'}
       </div>

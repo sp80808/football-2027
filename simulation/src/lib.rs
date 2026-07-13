@@ -35,7 +35,6 @@ impl SimulationCore {
         self.player_x += input_x * speed * dt;
         self.player_y += input_y * speed * dt;
 
-        // Ball gravity
         if self.ball_z > 0.0 {
             self.ball_vel_z -= 9.81 * dt;
         }

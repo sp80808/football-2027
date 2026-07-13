@@ -27,24 +27,23 @@ export default function App() {
     const loop = (time: number) => {
       reqId = requestAnimationFrame(loop);
       
-      // The TS engine handles its own fixed timestep internally
+      // Update TS engine which manages its own fixed timestep
       tsEngine.update(time);
+      
+      // Get current input to send to WASM
+      const input = tsEngine.input.currentFrame;
 
-      // In WASM mode, we would sample the input and submit it here.
-      if (useWasm) {
-        // Sample input and submit to WASM
-        const currentInput = tsEngine.input.currentFrame;
-        wasmClient.submitInput(currentInput);
-      }
+      // Send input to WASM worker
+      wasmClient.submitInput(input);
 
-      // Throttled HUD update for React
+      // Throttled HUD update
       if (Math.random() < 0.1) {
         setForceRender({});
       }
     };
     reqId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(reqId);
-  }, [useWasm]);
+  }, []);
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
@@ -61,5 +60,3 @@ export default function App() {
     </div>
   );
 }
-
-

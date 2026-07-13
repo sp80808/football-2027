@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
@@ -25,7 +25,6 @@
     "react-dom": "^19.0.1",
     "three": "^0.185.1",
     "vite": "^6.2.3",
-    "yuka": "^0.7.8",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
