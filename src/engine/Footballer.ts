@@ -417,6 +417,7 @@ export class Footballer {
     let lift = 0.5 * multiplier;
     let leadScale = 1;
     let powerScale = 1;
+    let spin: Vec3 | undefined;
 
     if (action === 'through_pass') { lift=1.2*multiplier; leadScale=1.35;
       if (opponent) { const la=cfg.THROUGH_LEAD_BASE+multiplier*cfg.THROUGH_LEAD_CHARGE_SCALE; const tgY=cfg.PITCH_HALF_LENGTH-opponent.pos.y,tgX=-opponent.pos.x,tl=Math.hypot(tgX,tgY);
@@ -436,6 +437,10 @@ export class Footballer {
       const targetY = this.pos.y > 0 ? cfg.PITCH_HALF_LENGTH - 11 : -(cfg.PITCH_HALF_LENGTH - 11);
       direction.set(0 - this.pos.x, targetY - this.pos.y);
       if (direction.magSq() > 0.01) direction.normalize();
+      
+      const curl = new Vec3(-direction.y, direction.x, 0);
+      const spinDir = this.pos.x > 0 ? 1 : -1;
+      spin = curl.mul(15 * multiplier * spinDir);
     } else {
       powerScale = 0.85 + multiplier * 0.2;
     }
@@ -456,7 +461,7 @@ export class Footballer {
       direction.x * passPower * powerScale * leadScale,
       direction.y * passPower * powerScale * leadScale,
       lift,
-    ));
+    ), spin);
   }
 
   private idealBallPosition(touch: string) {

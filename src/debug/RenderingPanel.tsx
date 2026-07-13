@@ -407,6 +407,8 @@ export function RenderingPanel({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const replayStateRef = useRef<WorldState | null>(replayState);
   const showOffsideLineRef = useRef(showOffsideLine);
+  const hudContainerRef = useRef<HTMLDivElement>(null);
+  const powerBarFillRef = useRef<HTMLDivElement>(null);
   const [rendererLabel, setRendererLabel] = useState('Initialising…');
   const [goalFlash, setGoalFlash] = useState<'player' | 'opponent' | null>(null);
   const previousGoal = useRef<'player' | 'opponent' | null>(null);
@@ -596,6 +598,20 @@ export function RenderingPanel({
           material.color.setHex(chargeConeColor(activePlayer));
           const scale = 0.6 + activePlayer.chargeStart * 1.2;
           activeCone.scale.setScalar(scale);
+
+          if (hudContainerRef.current && powerBarFillRef.current) {
+            hudContainerRef.current.style.opacity = '1';
+            const percent = Math.min(100, (activePlayer.chargeStart / SimulationConfig.MAX_CHARGE_TIME) * 100);
+            powerBarFillRef.current.style.width = `${percent}%`;
+            let color = '#22c55e';
+            if (percent > 85) color = '#ef4444';
+            else if (percent > 50) color = '#eab308';
+            powerBarFillRef.current.style.backgroundColor = color;
+          }
+        } else {
+          if (hudContainerRef.current) {
+            hudContainerRef.current.style.opacity = '0';
+          }
         }
 
         homeKeeperGroup.position.set(state.homeKeeper.pos.x, 0, -state.homeKeeper.pos.y);
@@ -719,6 +735,20 @@ export function RenderingPanel({
       <div className="pointer-events-none absolute bottom-2 right-3 rounded bg-black/35 px-2 py-1 text-[10px] text-white/50">
         {rendererLabel}
       </div>
+
+      {/* Player HUD */}
+      <div 
+        ref={hudContainerRef}
+        className="pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 opacity-0 transition-opacity duration-150"
+      >
+        <div className="bg-black/60 rounded-full px-5 py-2.5 backdrop-blur-md border border-white/10 shadow-2xl flex flex-col items-center">
+           <div className="text-white/90 text-[10px] font-black tracking-widest mb-1.5 uppercase drop-shadow-md">Power</div>
+           <div className="w-40 h-3 bg-black/80 rounded-full overflow-hidden border border-white/20 shadow-inner">
+             <div ref={powerBarFillRef} className="h-full w-0 bg-green-500 transition-all duration-75 ease-out rounded-full shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
+           </div>
+        </div>
+      </div>
+
       {goalFlash && (
         <div className={`pointer-events-none absolute inset-0 flex flex-col items-center justify-center ${goalFlash === 'player' ? 'bg-[radial-gradient(ellipse_at_center,rgba(30,120,255,0.18),transparent_70%)]' : 'bg-[radial-gradient(ellipse_at_center,rgba(220,50,50,0.18),transparent_70%)]'}`}>
           <p className={`m-0 text-6xl font-black tracking-wider drop-shadow-2xl ${goalFlash === 'player' ? 'text-blue-400' : 'text-red-400'}`}>GOAL</p>
