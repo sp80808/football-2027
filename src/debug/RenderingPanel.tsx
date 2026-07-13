@@ -9,9 +9,11 @@ interface RenderingPanelProps {
   useWasm: boolean;
   engine: GameEngine; // Fallback to TypeScript engine
   wasmClient: SimulationWorkerClient; // The Web Worker client
+  replayState?: WorldState | null;
+  showOffsideLine?: boolean;
 }
 
-export function RenderingPanel({ useWasm, engine, wasmClient }: RenderingPanelProps) {
+export function RenderingPanel({ useWasm, engine, wasmClient, replayState, showOffsideLine }: RenderingPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [rendererType, setRendererType] = useState<string>('Initializing...');
   
@@ -121,14 +123,33 @@ export function RenderingPanel({ useWasm, engine, wasmClient }: RenderingPanelPr
       ballMesh.castShadow = true;
       scene.add(ballMesh);
 
+      // Offside line visual
+      const offsideGeo = new THREE.PlaneGeometry(68, 0.2);
+      const offsideMat = new THREE.MeshBasicMaterial({ color: '#ffff00', transparent: true, opacity: 0.8, depthTest: false });
+      const offsideLine = new THREE.Mesh(offsideGeo, offsideMat);
+      offsideLine.rotation.x = -Math.PI / 2;
+      offsideLine.position.y = 0.01; // Slightly above pitch
+      offsideLine.visible = false;
+      scene.add(offsideLine);
+
       const renderLoop = () => {
         reqId = requestAnimationFrame(renderLoop);
         
         let state: WorldState;
-        if (useWasm) {
+        if (replayState) {
+          state = replayState;
+        } else if (useWasm) {
           state = wasmClient.getRenderState();
         } else {
           state = engine.getRenderState();
+        }
+
+        // Offside line logic - simple mock, placing it at player's Y if showOffsideLine
+        if (showOffsideLine) {
+          offsideLine.visible = true;
+          offsideLine.position.z = -state.player.pos.y;
+        } else {
+          offsideLine.visible = false;
         }
 
         // Interpolation would happen here

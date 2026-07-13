@@ -5,6 +5,7 @@ import { Keeper } from './Keeper';
 import { SimulationConfig } from './SimulationConfig';
 import { WorldState, createEmptyWorldState, cloneWorldState, interpolateWorldState } from './WorldState';
 import { SeededRandom } from './SeededRandom';
+import { RingBuffer } from './RingBuffer';
 
 export class GameEngine {
   input = new InputSystem();
@@ -24,6 +25,8 @@ export class GameEngine {
   public tps = 0;
   private ticksThisSecond = 0;
   private lastTpsTime = 0;
+  
+  public replayBuffer = new RingBuffer<WorldState>(600); // 5 seconds at 120Hz
 
   init() {
     this.input.init();
@@ -63,6 +66,7 @@ export class GameEngine {
       this.prevState = cloneWorldState(this.currState);
       this.tick();
       this.captureState(this.currState);
+      this.replayBuffer.push(cloneWorldState(this.currState));
       this.accumulator -= this.dt;
       this.ticksThisSecond++;
       didTick = true;
