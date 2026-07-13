@@ -563,6 +563,15 @@ export function RenderingPanel({
       offsideLine.visible = false;
       scene.add(offsideLine);
 
+      const targetRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.8, 1.0, 32),
+        new THREE.MeshBasicMaterial({ color: 0xeab308, transparent: true, opacity: 0.7, depthTest: false }),
+      );
+      targetRing.rotation.x = -Math.PI / 2;
+      targetRing.position.y = 0.015;
+      targetRing.visible = false;
+      scene.add(targetRing);
+
       const renderLoop = () => {
         requestId = requestAnimationFrame(renderLoop);
         const now = performance.now();
@@ -612,6 +621,15 @@ export function RenderingPanel({
           if (hudContainerRef.current) {
             hudContainerRef.current.style.opacity = '0';
           }
+        }
+
+        if (state.passTargetId !== null) {
+          const tMate = state.homeTeam[state.passTargetId];
+          targetRing.position.set(tMate.pos.x, 0.015, -tMate.pos.y);
+          targetRing.visible = true;
+          targetRing.rotation.z -= dt * 3;
+        } else {
+          targetRing.visible = false;
         }
 
         homeKeeperGroup.position.set(state.homeKeeper.pos.x, 0, -state.homeKeeper.pos.y);

@@ -5,6 +5,7 @@ import {
   LeagueTeam,
   LeagueTeamSchema,
 } from './careerSchemas';
+import { createCareerStateFromOpenFootball, fetchOpenFootballLeague } from './openFootballLoader';
 
 const STORAGE_KEY = 'football-2027-career';
 
@@ -121,6 +122,7 @@ interface CareerActions {
   getNextOpponent: () => LeagueTeam;
   recordMatchResult: (homeScore: number, awayScore: number) => void;
   resetCareer: () => void;
+  loadOpenFootballData: (leagueCode: string, season: string, playerClubName: string) => Promise<void>;
 }
 
 export type CareerStore = CareerState & CareerActions;
@@ -166,6 +168,18 @@ export const useCareerStore = create<CareerStore>((set, get) => ({
     const fresh = createDefaultCareerState();
     set(fresh);
     persist(fresh);
+  },
+
+  loadOpenFootballData: async (leagueCode: string, season: string, playerClubName: string) => {
+    const league = await fetchOpenFootballLeague(leagueCode, season);
+    if (!league) return;
+
+    const state = createCareerStateFromOpenFootball(league, playerClubName || PLAYER_CLUB_NAME);
+    if (!state) return;
+
+    const parsed = CareerStateSchema.parse(state);
+    set(parsed);
+    persist(parsed);
   },
 }));
 

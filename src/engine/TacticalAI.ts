@@ -2,6 +2,7 @@ import { Vec2 } from './Math';
 import { Ball } from './Ball';
 import { Player } from './Player';
 import { SimulationConfig } from './SimulationConfig';
+import { BehaviourTree, State } from 'mistreevous';
 
 /**
  * Tactical AI System
@@ -848,13 +849,14 @@ export class WingerAI extends BaseAIController {
 // Factory
 // ============================================
 
-export function createAIController(role: PlayerRole, attributes: PlayerAttributes): BaseAIController {
+export function createAIController(role: PlayerRole | 'BT', attributes: PlayerAttributes): BaseAIController {
   switch (role) {
     case 'GK': return new GoalkeeperAI(attributes);
     case 'CB': case 'LB': case 'RB': return new DefenderAI(attributes, role);
     case 'CDM': case 'CM': case 'CAM': return new MidfielderAI(attributes);
     case 'LW': case 'RW': return new WingerAI(attributes, role);
     case 'CF': case 'ST': return new AttackerAI(attributes);
+    case 'BT': return new BehaviourTreeAIController(attributes, 'CM');
     default: return new MidfielderAI(attributes);
   }
 }
@@ -927,4 +929,176 @@ export const ROLE_ATTRIBUTE_TEMPLATES: Record<PlayerRole, Partial<PlayerAttribut
     vision: 12, positioning: 20, decisions: 15, teamwork: 11, workRate: 10, flair: 12, composure: 17, anticipation: 18, concentration: 13,
     roleSuitability: { GK: 1, CB: 1, LB: 1, RB: 1, CDM: 2, CM: 4, CAM: 8, LW: 8, RW: 8, CF: 16, ST: 20 }
   }
+  }
 };
+
+// ============================================
+// Behaviour Tree AI Controller (Mistreevous)
+// ============================================
+
+export type BTAction =
+  | 'shoot'
+  | 'dribble'
+  | 'press'
+  | 'tackle'
+  | 'jockey'
+  | 'track'
+  | 'wait';
+
+export interface BTAgent {
+  hasPossession: boolean;
+  ballIsLoose: boolean;
+  playerHasBall: boolean;
+  canShoot: boolean;
+  canTackle: boolean;
+  selectedAction: BTAction;
+  cfg: typeof SimulationConfig;
+}
+
+export class BehaviourTreeAIController extends BaseAIController {
+  private tree: BehaviourTree;
+  private agent: BTAgent;
+  private static treeInitialized = false;
+
+  constructor(attributes: PlayerAttributes, role: PlayerRole) {
+    super(attributes, role);
+
+    this.agent = {
+      hasPossession: false,
+      ballIsLoose: false,
+      playerHasBall: false,
+      canShoot: false,
+      canTackle: false,
+      selectedAction: 'track',
+      cfg: SimulationConfig,
+    };
+
+    this.registerAgentMethods();
+    this.tree = new BehaviourTree(BehaviourTreeAIController.treeDefinition(), this.agent, {});
+  }
+
+  private static treeDefinition() {
+    return {
+      type: 'root',
+      child: {
+        type: 'selector',
+        children: [
+          {
+            type: 'sequence',
+            children: [
+              { type: 'condition', call: 'checkHasPossession' },
+              {
+                type: 'selector',
+                children: [
+                  {
+                    type: 'sequence',
+                    children: [
+                      { type: 'condition', call: 'checkCanShoot' },
+                      { type: 'action', call: 'doShoot' },
+                    ],
+                  },
+                  { type: 'action', call: 'doDribble' },
+                ],
+              },
+            ],
+          },
+          {
+            type: 'sequence',
+            children: [
+              { type: 'condition', call: 'checkBallLoose' },
+              { type: 'action', call: 'doPress' },
+            ],
+          },
+          {
+            type: 'sequence',
+            children: [
+              { type: 'condition', call: 'checkPlayerHasBall' },
+              {
+                type: 'selector',
+                children: [
+                  {
+                    type: 'sequence',
+                    children: [
+                      { type: 'condition', call: 'checkCanTackle' },
+                      { type: 'action', call: 'doTackle' },
+                    ],
+                  },
+                  { type: 'action', call: 'doJockey' },
+                ],
+              },
+            ],
+          },
+          { type: 'action', call: 'doTrack' },
+        ],
+      },
+    };
+  }
+
+  private registerAgentMethods() {
+    const methods: Record<string, (agent: BTAgent) => boolean | State> = {
+      checkHasPossession: () => this.agent.hasPossession,
+      checkBallLoose: () => this.agent.ballIsLoose,
+      checkPlayerHasBall: () => this.agent.playerHasBall,
+      checkCanShoot: () => this.agent.canShoot,
+      checkCanTackle: () => this.agent.canTackle,
+      doShoot: () => { this.agent.selectedAction = 'shoot'; return State.SUCCEEDED; },
+      doDribble: () => { this.agent.selectedAction = 'dribble'; return State.SUCCEEDED; },
+      doPress: () => { this.agent.selectedAction = 'press'; return State.SUCCEEDED; },
+      doTackle: () => { this.agent.selectedAction = 'tackle'; return State.SUCCEEDED; },
+      doJockey: () => { this.agent.selectedAction = 'jockey'; return State.SUCCEEDED; },
+      doTrack: () => { this.agent.selectedAction = 'track'; return State.SUCCEEDED; },
+    };
+
+    for (const [name, fn] of Object.entries(methods)) {
+      BehaviourTree.register(name, fn);
+    }
+  }
+
+  decide(context: AIContext): AIAction {
+    const cfg = context.cfg || SimulationConfig;
+    const self = context.self;
+    const ball = context.ball;
+    const distToBall = self.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y));
+    const distToPlayer = self.pos.distanceTo(context.opponents[0]?.pos ?? self.pos);
+
+    this.agent.hasPossession = distToBall < cfg.PLAYER_CONTROL_RADIUS && ball.pos.z < 1.0;
+    this.agent.ballIsLoose = !this.agent.hasPossession && ball.groundSpeed() > 0.5;
+    this.agent.playerHasBall = context.opponents.some(
+      (opp) => opp.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y)) < cfg.PLAYER_CONTROL_RADIUS && ball.pos.z < 1.0
+    );
+    this.agent.canShoot = distToBall < 25 && this.agent.hasPossession;
+    this.agent.canTackle = distToBall < 1.4 && this.agent.playerHasBall;
+
+    this.tree.step();
+
+    switch (this.agent.selectedAction) {
+      case 'shoot': {
+        const goalY = -cfg.PITCH_HALF_LENGTH;
+        const dir = new Vec2(0 - self.pos.x, goalY - self.pos.y).normalize();
+        return { type: 'shoot', target: new Vec2(0, goalY), power: 0.7 };
+      }
+      case 'dribble': {
+        const goalY = -cfg.PITCH_HALF_LENGTH;
+        const dir = new Vec2(0 - self.pos.x, goalY - self.pos.y).normalize();
+        return { type: 'dribble', direction: dir };
+      }
+      case 'press':
+        return { type: 'move', target: new Vec2(ball.pos.x, ball.pos.y), urgency: 0.9 };
+      case 'tackle':
+        return { type: 'tackle', target: new Vec2(ball.pos.x, ball.pos.y) };
+      case 'jockey': {
+        const carrier = context.opponents.find(
+          (opp) => opp.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y)) < cfg.PLAYER_CONTROL_RADIUS
+        );
+        const target = carrier ? carrier.pos.clone() : new Vec2(ball.pos.x, ball.pos.y);
+        return { type: 'move', target, urgency: 0.8 };
+      }
+      case 'track': {
+        const targetX = Math.max(-cfg.PITCH_HALF_WIDTH + 3, Math.min(cfg.PITCH_HALF_WIDTH - 3, ball.pos.x));
+        return { type: 'move', target: new Vec2(targetX, -15), urgency: 0.5 };
+      }
+      default:
+        return { type: 'wait' };
+    }
+  }
+}

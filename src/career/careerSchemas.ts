@@ -23,3 +23,24 @@ export const CareerStateSchema = z.object({
 
 export type LeagueTeam = z.infer<typeof LeagueTeamSchema>;
 export type CareerState = z.infer<typeof CareerStateSchema>;
+
+export const OpenFootballMatchSchema = z.object({
+  round: z.string(),
+  date: z.string(),
+  time: z.string().optional(),
+  team1: z.string(),
+  team2: z.string(),
+  score: z.object({
+    ft: z.tuple([z.number(), z.number()]).optional(),
+    ht: z.tuple([z.number(), z.number()]).optional(),
+  }),
+});
+
+export type OpenFootballMatch = z.infer<typeof OpenFootballMatchSchema>;
+
+export const OpenFootballLeagueSchema = z.object({
+  name: z.string(),
+  matches: z.array(OpenFootballMatchSchema),
+});
+
+export type OpenFootballLeague = z.infer<typeof OpenFootballLeagueSchema>;

@@ -90,7 +90,7 @@ export class Footballer {
   private readonly scratchToPlayer = new Vec2();
   private readonly scratchDelta = new Vec2();
 
-  update(dt: number, input: ControllerFrame, ball: Ball, opponent?: Footballer) {
+  update(dt: number, input: ControllerFrame, ball: Ball, opponent?: Footballer, passTargetPos?: Vec2) {
     this.tackleWonThisTick = false;
     if (this.tackleCooldown > 0) this.tackleCooldown -= dt;
     if (this.tackleTimer > 0) this.tackleTimer -= dt;
@@ -110,7 +110,9 @@ export class Footballer {
 
     if (this.defensiveState !== 'none') {
       this.tackleWonThisTick = this.updateDefensive(dt, ball, opponent);
-      return;
+    } else {
+      this.updateLocomotion(dt, intent);
+      this.updateBallInteraction(dt, input, intent, ball, opponent, passTargetPos);
     }
 
     if (opponent && (input.tacklePressed || input.slidePressed) && this.tackleCooldown <= 0) {
@@ -257,6 +259,7 @@ export class Footballer {
     intent: ReturnType<typeof parseIntent>,
     ball: Ball,
     opponent?: Footballer,
+    passTargetPos?: Vec2,
   ) {
     const cfg = SimulationConfig;
     const distanceToBall = this.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y));
@@ -287,7 +290,7 @@ export class Footballer {
 
     if (isFakeShot&&this.isCharging){this.applySkillMove(dt,'fake_shot',ball);this.isCharging=false;this.chargeStart=0;this.activeShotModifier='none';}
     else if (canFirstTime && this.isCharging) {
-      this.executeKick(ball, kickAction, intent, opponent);
+      this.executeKick(ball, kickAction, intent, opponent, passTargetPos);
       this.isCharging = false;
       this.chargeStart = 0;
       this.activePassModifier = 'none';
@@ -295,7 +298,7 @@ export class Footballer {
       this.controlState = 'free';
     } else if (kickAction && this.isCharging && !isFakeShot) {
       if (this.controlState === 'under_control' || this.controlState === 'loose_nearby') {
-        this.executeKick(ball, kickAction, intent, opponent);
+        this.executeKick(ball, kickAction, intent, opponent, passTargetPos);
       }
       this.isCharging = false;
       this.chargeStart = 0;
@@ -370,12 +373,17 @@ export class Footballer {
     }
   }
 
-  private executeKick(ball: Ball, action: BallAction, intent: ReturnType<typeof parseIntent>, opponent?: Footballer) {
+  private executeKick(ball: Ball, action: BallAction, intent: ReturnType<typeof parseIntent>, opponent?: Footballer, passTargetPos?: Vec2) {
     const cfg = SimulationConfig;
     const multiplier = Math.max(cfg.MIN_CHARGE_FRACTION, this.chargeStart / cfg.MAX_CHARGE_TIME);
     const direction = this.facing.clone();
 
     if (action === 'shot' || action === 'first_time') {
+      if (passTargetPos) {
+        direction.set(passTargetPos.x - this.pos.x, passTargetPos.y - this.pos.y);
+        if(direction.magSq()>0.01)direction.normalize();
+      }
+
       const powerScale = action === 'first_time' ? 0.75 : 1;
       const power = cfg.SHOT_POWER_BASE * multiplier * powerScale * this.kickPowerMul;
       let lift = (action === 'first_time' ? 1.6 : 3) * multiplier;
@@ -420,7 +428,13 @@ export class Footballer {
     let spin: Vec3 | undefined;
 
     if (action === 'through_pass') { lift=1.2*multiplier; leadScale=1.35;
-      if (opponent) { const la=cfg.THROUGH_LEAD_BASE+multiplier*cfg.THROUGH_LEAD_CHARGE_SCALE; const tgY=cfg.PITCH_HALF_LENGTH-opponent.pos.y,tgX=-opponent.pos.x,tl=Math.hypot(tgX,tgY);
+      if (passTargetPos) {
+        // Direct through ball past target
+        const tgY=cfg.PITCH_HALF_LENGTH-passTargetPos.y,tgX=-passTargetPos.x,tl=Math.hypot(tgX,tgY);
+        const la=cfg.THROUGH_LEAD_BASE+multiplier*cfg.THROUGH_LEAD_CHARGE_SCALE;
+        direction.set(passTargetPos.x+(tgX/tl)*la-this.pos.x,passTargetPos.y+(tgY/tl)*la-this.pos.y);
+        if(direction.magSq()>0.01)direction.normalize();
+      } else if (opponent) { const la=cfg.THROUGH_LEAD_BASE+multiplier*cfg.THROUGH_LEAD_CHARGE_SCALE; const tgY=cfg.PITCH_HALF_LENGTH-opponent.pos.y,tgX=-opponent.pos.x,tl=Math.hypot(tgX,tgY);
         if (tl>0.01){direction.set(opponent.pos.x+(tgX/tl)*la-this.pos.x,opponent.pos.y+(tgY/tl)*la-this.pos.y); if(direction.magSq()>0.01)direction.normalize();}}
       else {direction.add(this.vel.clone().mul(0.08*multiplier));direction.normalize();} powerScale=1.05; } else if (action === 'lob_pass') {
       lift = 5.5 * multiplier;
@@ -443,6 +457,11 @@ export class Footballer {
       spin = curl.mul(15 * multiplier * spinDir);
     } else {
       powerScale = 0.85 + multiplier * 0.2;
+    }
+
+    if (passTargetPos && action !== 'through_pass' && action !== 'cross') {
+      direction.set(passTargetPos.x - this.pos.x, passTargetPos.y - this.pos.y);
+      if(direction.magSq()>0.01)direction.normalize();
     }
 
     const speedRatio = this.vel.mag() / cfg.PLAYER_SPRINT_SPEED;

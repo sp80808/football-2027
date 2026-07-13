@@ -223,6 +223,20 @@ export const DATA_SOURCES = {
     baseUrl: 'https://overpass-api.de/api/interpreter',
     query: '[out:json];area["name"="England"];(node["leisure"="stadium"](area);way["leisure"="stadium"](area);relation["leisure"="stadium"](area););out center;',
     rateLimit: 1000
+  },
+  'openfootball': {
+    baseUrl: 'https://raw.githubusercontent.com/openfootball/football.json/master',
+    leagues: {
+      'en.1': 'English Premier League',
+      'en.2': 'English Championship',
+      'en.3': 'English League One',
+      'de.1': 'German Bundesliga',
+      'es.1': 'Spanish La Liga',
+      'it.1': 'Italian Serie A',
+      'fr.1': 'French Ligue 1'
+    },
+    format: 'json',
+    rateLimit: 1000
   }
 } as const;
 
@@ -339,6 +353,43 @@ export class DataProcessor {
       warnings: [],
       metadata: { source: 'multiple', timestamp: new Date().toISOString(), recordCount: 0, processingTimeMs: 0 }
     };
+  }
+
+  async fetchOpenFootballMatches(leagueCode: string, season: string): Promise<ProcessingResult<any>> {
+    const url = `${DATA_SOURCES['openfootball'].baseUrl}/${season}/${leagueCode}.json`;
+    const startTime = Date.now();
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        return {
+          success: false,
+          data: [],
+          errors: [{ code: 'FETCH_ERROR', message: `Failed to fetch ${url}: ${response.statusText}`, severity: 'critical' }],
+          warnings: [],
+          metadata: { source: 'openfootball', timestamp: new Date().toISOString(), recordCount: 0, processingTimeMs: Date.now() - startTime }
+        };
+      }
+
+      const raw = await response.json();
+      const matches = raw.matches || [];
+
+      return {
+        success: true,
+        data: matches,
+        errors: [],
+        warnings: matches.length === 0 ? [{ code: 'NO_DATA', message: `No matches found for ${leagueCode} ${season}` }] : [],
+        metadata: { source: 'openfootball', timestamp: new Date().toISOString(), recordCount: matches.length, processingTimeMs: Date.now() - startTime }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        data: [],
+        errors: [{ code: 'NETWORK_ERROR', message: `Error fetching openfootball data: ${error}`, severity: 'critical' }],
+        warnings: [],
+        metadata: { source: 'openfootball', timestamp: new Date().toISOString(), recordCount: 0, processingTimeMs: Date.now() - startTime }
+      };
+    }
   }
 
   // Rate limiting helper

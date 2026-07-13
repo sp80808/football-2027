@@ -12,6 +12,7 @@ import { OffsideDetector } from './OffsideDetector';
 import { ControllerFrame, createEmptyFrame } from './Intent';
 import { ReplayData, ReplayRecorder } from './ReplayRecorder';
 import { MatchManager, MatchSnapshot } from './MatchManager';
+import { TargetFinder } from './TargetFinder';
 
 const DEFAULT_SIM_SEED = 12345;
 
@@ -76,6 +77,7 @@ export class GameEngine {
   private passbackTimer = 0;
   private previousControlState = this.homeTeam[0].controlState;
   public offsideLineY: number | null = null;
+  public passTargetId: number | null = null;
 
   // Offside detector caches
   private readonly homeOffsideCache = Array.from({ length: 10 }, (_, i) => ({ id: i, pos: new Vec2(), involvedInPlay: true }));
@@ -150,6 +152,7 @@ export class GameEngine {
     this.awaitingOffsideCheck = false;
     this.passbackTimer = 0;
     this.offsideLineY = null;
+    this.passTargetId = null;
     this.captureState(this.previousState, 0);
     this.captureState(this.currentState, 0);
     copyWorldState(this.currentState, this.renderState);
@@ -322,6 +325,18 @@ export class GameEngine {
 
     const activePlayer = this.homeTeam[this.activeHomeIndex];
 
+    // Determine target based on left stick
+    this.passTargetId = null;
+    if (activePlayer.controlState === 'under_control' || activePlayer.controlState === 'receiving') {
+      const intentDir = humanInput.leftStick;
+      this.passTargetId = TargetFinder.findPassTarget(
+        activePlayer.id,
+        activePlayer.pos,
+        intentDir,
+        this.homeTeam
+      );
+    }
+
     const passReleased =
       (humanInput.passReleased || humanInput.throughPassReleased) &&
       activePlayer.isCharging &&
@@ -344,7 +359,17 @@ export class GameEngine {
 
     // Update outfields
     for(let i=0; i<10; i++) {
-        this.homeTeam[i].update(this.dt, this.homeFrames[i], this.ball, undefined); // No direct opponent targeted for now
+        let targetPos: Vec2 | undefined = undefined;
+        if (i === this.activeHomeIndex) {
+          if (activePlayer.chargeType === 'shoot') {
+             targetPos = TargetFinder.getShotTarget(activePlayer.pos, humanInput.leftStick, true);
+          } else if (this.passTargetId !== null) {
+             const targetMate = this.homeTeam.find(m => m.id === this.passTargetId);
+             if (targetMate) targetPos = targetMate.pos;
+          }
+        }
+        
+        this.homeTeam[i].update(this.dt, this.homeFrames[i], this.ball, undefined, targetPos);
         this.awayTeam[i].update(this.dt, this.awayFrames[i], this.ball, undefined);
         
         if (this.homeTeam[i].tackleWonThisTick) {
@@ -482,6 +507,7 @@ export class GameEngine {
   private captureState(state: WorldState, tick: number) {
     state.tick = tick;
     state.activeHomeIndex = this.activeHomeIndex;
+    state.passTargetId = this.passTargetId;
     
     for (let i = 0; i < 10; i++) {
         const hp = this.homeTeam[i];

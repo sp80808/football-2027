@@ -40,6 +40,7 @@ export interface WorldState {
   scoreOpponent: number;
   lastGoalScorer: 'player' | 'opponent' | null;
   offsideLineY: number | null;
+  passTargetId: number | null;
 }
 
 function createEmptyFootballer(id: number): FootballerState {
@@ -72,6 +73,7 @@ export function createEmptyWorldState(): WorldState {
     scoreOpponent: 0,
     lastGoalScorer: null,
     offsideLineY: null,
+    passTargetId: null,
   };
 }
 
@@ -123,6 +125,7 @@ export function copyWorldState(src: WorldState, dest: WorldState) {
   dest.scoreOpponent = src.scoreOpponent;
   dest.lastGoalScorer = src.lastGoalScorer;
   dest.offsideLineY = src.offsideLineY;
+  dest.passTargetId = src.passTargetId;
 }
 
 export function interpolateWorldState(previous: WorldState, next: WorldState, alpha: number, result: WorldState) {
