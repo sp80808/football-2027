@@ -4,6 +4,8 @@ import { RendererFactory } from '../rendering/RendererFactory';
 import { WorldState } from '../engine/WorldState';
 import { SimulationWorkerClient } from '../bridge/SimulationWorkerClient';
 import { GameEngine } from '../engine/GameEngine';
+import { addStadiumToScene } from '../scene/createStadium';
+import { BallTrail, GoalCelebration } from '../scene/effects';
 
 interface RenderingPanelProps {
   useWasm: boolean;
@@ -179,6 +181,7 @@ export function RenderingPanel({
     if (!canvasRef.current) return;
     let cancelled = false;
     let renderer: any = null;
+    let ballTrail: BallTrail | null = null;
     let requestId = 0;
     let goalTimeout: number | undefined;
 
@@ -207,6 +210,8 @@ export function RenderingPanel({
       sun.castShadow = true;
       if (sun.shadow) sun.shadow.mapSize.set(2048, 2048);
       scene.add(sun);
+
+      addStadiumToScene(scene);
 
       const pitch = new THREE.Mesh(
         new THREE.PlaneGeometry(68, 105),
@@ -238,6 +243,10 @@ export function RenderingPanel({
       const ballShadow = createShadow(0.2, 0.35);
       scene.add(ballShadow);
 
+      ballTrail = new BallTrail(scene);
+      const goalCelebration = new GoalCelebration(scene);
+      let lastFrameTime = performance.now();
+
       const offsideLine = new THREE.Mesh(
         new THREE.PlaneGeometry(68, 0.16),
         new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.8, depthTest: false }),
@@ -249,17 +258,11 @@ export function RenderingPanel({
 
       const renderLoop = () => {
         requestId = requestAnimationFrame(renderLoop);
-        const state = replayStateRef.current ?? (useWasm ? wasmClient.getRenderState() : engine.getRenderState());
+        const now = performance.now();
+        const dt = Math.min((now - lastFrameTime) / 1000, 0.05);
+        lastFrameTime = now;
 
-        if (state.lastGoalScorer && state.lastGoalScorer !== previousGoal.current) {
-          previousGoal.current = state.lastGoalScorer;
-          setGoalFlash(state.lastGoalScorer);
-          if (goalTimeout) window.clearTimeout(goalTimeout);
-          goalTimeout = window.setTimeout(() => {
-            previousGoal.current = null;
-            setGoalFlash(null);
-          }, 2500);
-        }
+        const state = replayStateRef.current ?? (useWasm ? wasmClient.getRenderState() : engine.getRenderState());
 
         playerGroup.position.set(state.player.pos.x, 0, -state.player.pos.y);
         playerGroup.rotation.y = Math.atan2(state.player.facing.x, state.player.facing.y);
@@ -287,14 +290,33 @@ export function RenderingPanel({
         ballShadow.scale.setScalar(shadowScale);
         (ballShadow.material as THREE.MeshBasicMaterial).opacity = 0.35 * shadowScale;
 
+        const ballSpeed = state.ball.vel.mag();
+        ballTrail!.update(ball.position, ballSpeed);
+
+        if (state.lastGoalScorer && state.lastGoalScorer !== previousGoal.current) {
+          previousGoal.current = state.lastGoalScorer;
+          setGoalFlash(state.lastGoalScorer);
+          goalCelebration.trigger(ball.position.clone());
+          if (goalTimeout) window.clearTimeout(goalTimeout);
+          goalTimeout = window.setTimeout(() => {
+            previousGoal.current = null;
+            setGoalFlash(null);
+          }, 2500);
+        }
+
+        goalCelebration.update(dt);
+
         offsideLine.visible = showOffsideLineRef.current;
         if (offsideLine.visible) offsideLine.position.z = -state.opponent.pos.y;
 
         const focusX = (state.player.pos.x + state.ball.pos.x) * 0.5;
         const focusZ = -(state.player.pos.y + state.ball.pos.y) * 0.5;
+        const spread = Math.hypot(state.player.pos.x - state.ball.pos.x, state.player.pos.y - state.ball.pos.y);
+        const cameraDistance = THREE.MathUtils.clamp(20 + spread * 0.35 + ballSpeed * 0.12, 18, 32);
+        const cameraHeight = THREE.MathUtils.clamp(14 + spread * 0.08, 12, 20);
         camera.position.x += (focusX * 0.35 - camera.position.x) * 0.05;
-        camera.position.z += (focusZ + 22 - camera.position.z) * 0.05;
-        camera.position.y += (16 - camera.position.y) * 0.05;
+        camera.position.z += (focusZ + cameraDistance - camera.position.z) * 0.05;
+        camera.position.y += (cameraHeight - camera.position.y) * 0.05;
         camera.lookAt(focusX * 0.4, 0, focusZ);
         renderer.render(scene, camera);
       };
@@ -315,6 +337,7 @@ export function RenderingPanel({
       cancelAnimationFrame(requestId);
       if (goalTimeout) window.clearTimeout(goalTimeout);
       window.removeEventListener('resize', resize);
+      ballTrail?.dispose();
       renderer?.dispose?.();
     };
   }, [useWasm, engine, wasmClient]);
