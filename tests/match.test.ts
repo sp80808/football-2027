@@ -65,7 +65,6 @@ describe('MatchManager', () => {
 
     for (let i = 0; i < Math.ceil(cfg.HALFTIME_SECONDS * 120) + 5; i++) {
       match.update(1 / 120, ball, player, keeper);
-      if (match.state.phase === 'kickoff') break;
     }
 
     expect(match.state.half).toBe(2);
