@@ -37,13 +37,29 @@ export class Opponent {
   private readonly SHOOT_RANGE = 28;
   private readonly SHOOT_ANGLE_COS = 0.70;
 
+  private readonly scratchBallPos = new Vec2();
+  private readonly scratchGoal = new Vec2();
+  private readonly scratchDir = new Vec2();
+  private readonly scratchJockeyTarget = new Vec2();
+  private readonly scratchToTarget = new Vec2();
+  private readonly scratchLateral = new Vec2();
+  private readonly scratchIdealBall = new Vec2();
+
+  /** Synthetic pass-lane anchors the carrier might use (player attacks +Y). */
+  private static readonly PASS_CORRIDORS: ReadonlyArray<readonly [number, number]> = [
+    [-18, 40],
+    [18, 40],
+    [0, 48],
+  ];
+
   update(dt: number, ball: Ball, humanPlayer: Player) {
     const cfg = SimulationConfig;
 
     if (this.tackleTimer > 0) this.tackleTimer -= dt;
     if (this.tackleCooldown > 0) this.tackleCooldown -= dt;
 
-    const distToBall = this.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y));
+    this.scratchBallPos.set(ball.pos.x, ball.pos.y);
+    const distToBall = this.pos.distanceTo(this.scratchBallPos);
     const hasPossession = distToBall < cfg.PLAYER_CONTROL_RADIUS && ball.pos.z < 1.0;
     const ballIsLoose = humanPlayer.controlState === 'free' && ball.groundSpeed() > 0.5;
 
@@ -72,18 +88,18 @@ export class Opponent {
 
   private updateWithPossession(dt: number, ball: Ball) {
     const cfg = SimulationConfig;
-    const goalPos = new Vec2(0, -cfg.PITCH_HALF_LENGTH);
-    const toGoal = new Vec2(goalPos.x - this.pos.x, goalPos.y - this.pos.y);
-    const distToGoal = this.pos.distanceTo(goalPos);
+    this.scratchGoal.set(0, -cfg.PITCH_HALF_LENGTH);
+    this.scratchDir.set(this.scratchGoal.x - this.pos.x, this.scratchGoal.y - this.pos.y);
+    const distToGoal = this.scratchDir.mag();
 
-    if (toGoal.magSq() > 0.01) {
-      toGoal.normalize();
-      this.facing.x += (toGoal.x - this.facing.x) * 10 * dt;
-      this.facing.y += (toGoal.y - this.facing.y) * 10 * dt;
+    if (this.scratchDir.magSq() > 0.01) {
+      this.scratchDir.normalize();
+      this.facing.x += (this.scratchDir.x - this.facing.x) * 10 * dt;
+      this.facing.y += (this.scratchDir.y - this.facing.y) * 10 * dt;
       this.facing.normalize();
     }
 
-    const facingDotGoal = this.facing.dot(toGoal.magSq() > 0 ? toGoal : new Vec2(0, -1));
+    const facingDotGoal = this.facing.dot(this.scratchDir.magSq() > 0 ? this.scratchDir : this.scratchGoal.set(0, -1));
     if (distToGoal < this.SHOOT_RANGE && facingDotGoal > this.SHOOT_ANGLE_COS) {
       this.aiState = 'shooting';
       const power = cfg.SHOT_POWER_BASE * 0.85;
@@ -98,34 +114,77 @@ export class Opponent {
     this.pos.x += this.vel.x * dt;
     this.pos.y += this.vel.y * dt;
 
-    const idealBall = this.pos.clone().add(this.facing.clone().mul(0.5));
-    ball.vel.x += (idealBall.x - ball.pos.x) * 18 * dt;
-    ball.vel.y += (idealBall.y - ball.pos.y) * 18 * dt;
+    this.scratchIdealBall.set(
+      this.pos.x + this.facing.x * 0.5,
+      this.pos.y + this.facing.y * 0.5,
+    );
+    ball.vel.x += (this.scratchIdealBall.x - ball.pos.x) * 18 * dt;
+    ball.vel.y += (this.scratchIdealBall.y - ball.pos.y) * 18 * dt;
   }
 
   private pressBall(dt: number, ball: Ball, cfg: typeof SimulationConfig) {
     this.aiState = 'pressing';
-    const toTarget = new Vec2(ball.pos.x - this.pos.x, ball.pos.y - this.pos.y);
-    if (toTarget.magSq() > 0.01) {
-      toTarget.normalize();
+    this.scratchToTarget.set(ball.pos.x - this.pos.x, ball.pos.y - this.pos.y);
+    if (this.scratchToTarget.magSq() > 0.01) {
+      this.scratchToTarget.normalize();
       const speed = cfg.PLAYER_SPRINT_SPEED;
-      this.vel.x += (toTarget.x * speed - this.vel.x) * 10 * dt;
-      this.vel.y += (toTarget.y * speed - this.vel.y) * 10 * dt;
-      this.facing.copy(toTarget);
+      this.vel.x += (this.scratchToTarget.x * speed - this.vel.x) * 10 * dt;
+      this.vel.y += (this.scratchToTarget.y * speed - this.vel.y) * 10 * dt;
+      this.facing.copy(this.scratchToTarget);
     }
     this.applyVelocity(dt, cfg);
   }
 
+  /**
+   * Pick a jockey anchor goal-side on the most threatening lane:
+   * player→attack-goal or player→nearest aligned passing corridor.
+   */
+  private computeJockeyTarget(humanPlayer: Player, cfg: typeof SimulationConfig) {
+    const px = humanPlayer.pos.x;
+    const py = humanPlayer.pos.y;
+    const fx = humanPlayer.facing.x;
+    const fy = humanPlayer.facing.y;
+
+    this.scratchGoal.set(0, cfg.PITCH_HALF_LENGTH);
+    let bestDx = this.scratchGoal.x - px;
+    let bestDy = this.scratchGoal.y - py;
+    let bestDist = Math.sqrt(bestDx * bestDx + bestDy * bestDy);
+    let bestNormX = bestDist > 0.01 ? bestDx / bestDist : 0;
+    let bestNormY = bestDist > 0.01 ? bestDy / bestDist : 1;
+    let bestAlign = bestDist > 0.01 ? (fx * bestDx + fy * bestDy) / bestDist : 1;
+
+    for (let i = 0; i < Opponent.PASS_CORRIDORS.length; i++) {
+      const corridor = Opponent.PASS_CORRIDORS[i];
+      const dx = corridor[0] - px;
+      const dy = corridor[1] - py;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 0.01) continue;
+
+      const align = (fx * dx + fy * dy) / dist;
+      if (align > bestAlign) {
+        bestAlign = align;
+        bestNormX = dx / dist;
+        bestNormY = dy / dist;
+      }
+    }
+
+    this.scratchJockeyTarget.set(
+      px + bestNormX * this.JOCKEY_DIST,
+      py + bestNormY * this.JOCKEY_DIST,
+    );
+  }
+
   private jockeyAndTackle(dt: number, ball: Ball, humanPlayer: Player, cfg: typeof SimulationConfig) {
-    const distToBall = this.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y));
+    this.scratchBallPos.set(ball.pos.x, ball.pos.y);
+    const distToBall = this.pos.distanceTo(this.scratchBallPos);
 
     if (this.tackleTimer > 0) {
       this.aiState = 'tackling';
-      const toBall = new Vec2(ball.pos.x - this.pos.x, ball.pos.y - this.pos.y);
-      if (toBall.magSq() > 0.01) {
-        toBall.normalize();
-        this.vel.x += toBall.x * cfg.PLAYER_SPRINT_SPEED * 1.2 * dt;
-        this.vel.y += toBall.y * cfg.PLAYER_SPRINT_SPEED * 1.2 * dt;
+      this.scratchToTarget.set(ball.pos.x - this.pos.x, ball.pos.y - this.pos.y);
+      if (this.scratchToTarget.magSq() > 0.01) {
+        this.scratchToTarget.normalize();
+        this.vel.x += this.scratchToTarget.x * cfg.PLAYER_SPRINT_SPEED * 1.2 * dt;
+        this.vel.y += this.scratchToTarget.y * cfg.PLAYER_SPRINT_SPEED * 1.2 * dt;
       }
       if (distToBall < this.TACKLE_RANGE * 0.6) this.dispossess(ball, humanPlayer, cfg);
       this.applyVelocity(dt, cfg);
@@ -133,21 +192,35 @@ export class Opponent {
     }
 
     this.aiState = 'jockeying';
-    const toPlayer = new Vec2(humanPlayer.pos.x - this.pos.x, humanPlayer.pos.y - this.pos.y);
     const distToPlayer = this.pos.distanceTo(humanPlayer.pos);
 
     if (distToPlayer > this.JOCKEY_DIST) {
-      toPlayer.normalize();
-      const speed = cfg.PLAYER_MAX_SPEED * 0.75;
-      this.vel.x += (toPlayer.x * speed - this.vel.x) * 6 * dt;
-      this.vel.y += (toPlayer.y * speed - this.vel.y) * 6 * dt;
-      this.facing.copy(toPlayer);
+      this.computeJockeyTarget(humanPlayer, cfg);
+      this.scratchToTarget.set(
+        this.scratchJockeyTarget.x - this.pos.x,
+        this.scratchJockeyTarget.y - this.pos.y,
+      );
+      const distToTarget = this.scratchToTarget.mag();
+      if (distToTarget > 0.15) {
+        this.scratchToTarget.div(distToTarget);
+        const speed = cfg.PLAYER_MAX_SPEED * 0.75;
+        this.vel.x += (this.scratchToTarget.x * speed - this.vel.x) * 6 * dt;
+        this.vel.y += (this.scratchToTarget.y * speed - this.vel.y) * 6 * dt;
+      }
+      this.scratchDir.set(humanPlayer.pos.x - this.pos.x, humanPlayer.pos.y - this.pos.y);
+      if (this.scratchDir.magSq() > 0.01) {
+        this.scratchDir.normalize();
+        this.facing.copy(this.scratchDir);
+      }
     } else {
-      const lateralVel = new Vec2(humanPlayer.vel.x * 0.8, humanPlayer.vel.y * 0.8);
-      this.vel.x += (lateralVel.x - this.vel.x) * 5 * dt;
-      this.vel.y += (lateralVel.y - this.vel.y) * 5 * dt;
-      toPlayer.normalize();
-      this.facing.copy(toPlayer);
+      this.scratchLateral.set(humanPlayer.vel.x * 0.8, humanPlayer.vel.y * 0.8);
+      this.vel.x += (this.scratchLateral.x - this.vel.x) * 5 * dt;
+      this.vel.y += (this.scratchLateral.y - this.vel.y) * 5 * dt;
+      this.scratchDir.set(humanPlayer.pos.x - this.pos.x, humanPlayer.pos.y - this.pos.y);
+      if (this.scratchDir.magSq() > 0.01) {
+        this.scratchDir.normalize();
+        this.facing.copy(this.scratchDir);
+      }
 
       if (distToBall < this.TACKLE_RANGE && this.tackleCooldown <= 0) {
         this.tackleTimer = this.TACKLE_DURATION;
@@ -161,14 +234,14 @@ export class Opponent {
   private trackBall(dt: number, ball: Ball, cfg: typeof SimulationConfig) {
     this.aiState = 'tracking';
     const targetX = Math.max(-cfg.PITCH_HALF_WIDTH + 3, Math.min(cfg.PITCH_HALF_WIDTH - 3, ball.pos.x));
-    const toTarget = new Vec2(targetX - this.pos.x, -15 - this.pos.y);
+    this.scratchToTarget.set(targetX - this.pos.x, -15 - this.pos.y);
 
-    if (toTarget.magSq() > 0.25) {
-      toTarget.normalize();
+    if (this.scratchToTarget.magSq() > 0.25) {
+      this.scratchToTarget.normalize();
       const speed = cfg.PLAYER_MAX_SPEED * 0.6;
-      this.vel.x += (toTarget.x * speed - this.vel.x) * 4 * dt;
-      this.vel.y += (toTarget.y * speed - this.vel.y) * 4 * dt;
-      this.facing.copy(toTarget);
+      this.vel.x += (this.scratchToTarget.x * speed - this.vel.x) * 4 * dt;
+      this.vel.y += (this.scratchToTarget.y * speed - this.vel.y) * 4 * dt;
+      this.facing.copy(this.scratchToTarget);
     } else {
       this.vel.x *= 1 - dt * 8;
       this.vel.y *= 1 - dt * 8;
@@ -202,7 +275,8 @@ export class Opponent {
 
   dispossessByPlayer(ball: Ball, humanPlayer: Player): boolean {
     const cfg = SimulationConfig;
-    const distToBall = this.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y));
+    this.scratchBallPos.set(ball.pos.x, ball.pos.y);
+    const distToBall = this.pos.distanceTo(this.scratchBallPos);
     if (distToBall >= cfg.PLAYER_CONTROL_RADIUS || ball.pos.z >= 1.0) return false;
 
     const clearAngle = Math.atan2(-this.facing.y, -this.facing.x);
