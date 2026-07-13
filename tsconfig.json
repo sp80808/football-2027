@@ -4,30 +4,26 @@
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "module": "ESNext",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
+    "paths": { "@/*": ["./*"] },
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
+  "include": ["src/**/*", "tests/**/*", "e2e/**/*", "vite.config.ts", "playwright.config.ts"],
   "exclude": [
     "src/legacy",
     "src/engine/TacticalAI.ts",
     "src/engine/FootballDataPipeline.ts",
     "src/rendering/AdvancedRendering.ts",
-    "tests/advanced.test.ts"
+    "tests/advanced.test.ts",
+    "tests/career.test.ts",
+    "dist",
+    "node_modules"
   ]
 }
