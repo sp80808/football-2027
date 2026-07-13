@@ -184,25 +184,35 @@ export class GameEngine {
   }
 
   private enforceBoundaries() {
-    const hw = SimulationConfig.PITCH_HALF_WIDTH;
-    const hl = SimulationConfig.PITCH_HALF_LENGTH;
+    const cfg = SimulationConfig;
+    const hw = cfg.PITCH_HALF_WIDTH;
+    const hl = cfg.PITCH_HALF_LENGTH;
+    const gw = cfg.GOAL_HALF_WIDTH;
     
+    // ── Ball side boundaries (touchlines) ─────────────────────────────────
     if (this.ball.pos.x > hw) {
       this.ball.pos.x = hw;
-      this.ball.vel.x *= -0.5;
+      this.ball.vel.x *= -0.55;
     } else if (this.ball.pos.x < -hw) {
       this.ball.pos.x = -hw;
-      this.ball.vel.x *= -0.5;
+      this.ball.vel.x *= -0.55;
     }
 
-    if (this.ball.pos.y > hl) {
-      this.ball.pos.y = hl;
-      this.ball.vel.y *= -0.5;
-    } else if (this.ball.pos.y < -hl) {
-      this.ball.pos.y = -hl;
-      this.ball.vel.y *= -0.5;
+    // ── Ball end boundaries (goal lines / behind goal) ────────────────────
+    // Only bounce if the ball is OUTSIDE the goal posts (i.e. not a goal).
+    // If it is within post width AND low enough, the goal check handles it.
+    const inGoalMouth = Math.abs(this.ball.pos.x) <= gw && this.ball.pos.z <= cfg.GOAL_HEIGHT;
+    if (!inGoalMouth) {
+      if (this.ball.pos.y > hl) {
+        this.ball.pos.y = hl;
+        this.ball.vel.y *= -0.55;
+      } else if (this.ball.pos.y < -hl) {
+        this.ball.pos.y = -hl;
+        this.ball.vel.y *= -0.55;
+      }
     }
     
+    // ── Player pitch clamp ─────────────────────────────────────────────────
     if (this.player.pos.x > hw) this.player.pos.x = hw;
     if (this.player.pos.x < -hw) this.player.pos.x = -hw;
     if (this.player.pos.y > hl) this.player.pos.y = hl;

@@ -23,20 +23,25 @@ export const SimulationConfig = {
   // ── Ball Physics ─────────────────────────────────────────────────────────
   BALL_RADIUS: 0.11,
   BALL_MASS: 0.43,
-  /** Per-tick rolling-friction multiplier (applied each 120Hz tick on ground). */
-  BALL_FRICTION: 0.988,
+  /**
+   * Per-second rolling-friction multiplier on grass.
+   * Applied as Math.pow(BALL_FRICTION, dt) each tick so it is rate-independent.
+   * 0.965 ≈ lose ~3.5% speed per second — realistic short-grass roll.
+   */
+  BALL_FRICTION: 0.965,
   BALL_GRAVITY: 9.81,
-  BALL_BOUNCINESS: 0.6,
-  /** Minimum vertical speed below which bounce is killed. */
-  BALL_BOUNCE_DEAD_ZONE: 0.5,
-  /** Light air drag applied every tick while airborne (multiplicative). */
-  BALL_AIR_DRAG: 0.9997,
+  /** Coefficient of restitution on bounce (0 = dead, 1 = perfect). */
+  BALL_BOUNCINESS: 0.62,
+  /** Minimum vertical speed (m/s) below which bounce is killed (settles). */
+  BALL_BOUNCE_DEAD_ZONE: 0.4,
+  /** Horizontal air drag coefficient per second (multiplicative). */
+  BALL_AIR_DRAG: 0.994,
 
   // ── Player Locomotion ─────────────────────────────────────────────────────
-  PLAYER_MAX_SPEED: 7.0,    // m/s normal
-  PLAYER_SPRINT_SPEED: 9.0, // m/s sprint
-  PLAYER_ACCEL: 15.0,       // m/s² ground acceleration
-  PLAYER_DECEL: 25.0,       // m/s² ground deceleration
+  PLAYER_MAX_SPEED: 6.5,    // m/s normal (FIFA-scale ~6-7 m/s)
+  PLAYER_SPRINT_SPEED: 8.5, // m/s sprint
+  PLAYER_ACCEL: 18.0,       // m/s² — snappy acceleration
+  PLAYER_DECEL: 28.0,       // m/s² — quick stop
 
   /** Turn rate (rad/s) when nearly stationary — very agile. */
   PLAYER_TURN_SPEED_WALK: 14.0,
@@ -63,23 +68,31 @@ export const SimulationConfig = {
   TOUCH_TETHER_GAIN: 4.0,
 
   // ── Pass / Shoot ─────────────────────────────────────────────────────────
-  PASS_POWER_BASE: 12.0,
-  SHOT_POWER_BASE: 25.0,
-  MAX_CHARGE_TIME: 1.5,
+  /**
+   * Pass and shot power are in N (force applied to ball).
+   * ball.kick() divides by BALL_MASS (0.43 kg), so:
+   *   PASS_POWER_BASE 7 N → ~16 m/s max pass speed (good for 20 m)
+   *   SHOT_POWER_BASE 13 N → ~30 m/s max shot speed (strong but not ridiculous)
+   */
+  PASS_POWER_BASE: 7.0,
+  SHOT_POWER_BASE: 13.0,
+  MAX_CHARGE_TIME: 1.2,
   /** Minimum charge fraction so a tap still produces a kick. */
-  MIN_CHARGE_FRACTION: 0.15,
+  MIN_CHARGE_FRACTION: 0.2,
 
   // ── Goalkeeper ───────────────────────────────────────────────────────────
-  KEEPER_MAX_SPEED: 5.5,        // m/s lateral strafe
-  KEEPER_DIVE_SPEED: 9.0,       // m/s during a diving save
+  KEEPER_MAX_SPEED: 6.0,        // m/s lateral strafe
+  KEEPER_DIVE_SPEED: 10.0,      // m/s during a diving save
   /** Seconds the keeper predicts ahead along ball trajectory. */
-  KEEPER_LOOKAHEAD_TIME: 0.55,
+  KEEPER_LOOKAHEAD_TIME: 0.4,
   /** Distance at which keeper triggers a save response. */
-  KEEPER_SAVE_RADIUS: 1.6,
+  KEEPER_SAVE_RADIUS: 2.0,
   /** Distance at which keeper commits to a dive. */
-  KEEPER_DIVE_TRIGGER_RADIUS: 2.4,
+  KEEPER_DIVE_TRIGGER_RADIUS: 4.5,
   /** Minimum ball speed (m/s) for a dive to be worth attempting. */
-  KEEPER_DIVE_MIN_BALL_SPEED: 4.0,
+  KEEPER_DIVE_MIN_BALL_SPEED: 3.5,
   /** How long the keeper stays in dive state (seconds). */
-  KEEPER_DIVE_DURATION: 0.5,
+  KEEPER_DIVE_DURATION: 0.55,
+  /** How long the keeper takes to recover after a dive. */
+  KEEPER_RECOVER_DURATION: 1.2,
 };

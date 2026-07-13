@@ -12,10 +12,10 @@ export class Ball {
     if (this.pos.z > 0) {
       this.vel.z -= cfg.BALL_GRAVITY * dt;
 
-      // Very light air drag on horizontal velocity when the ball is in flight.
-      // Uses a multiplicative approach so it's properly dt-scaled at 120 Hz.
-      this.vel.x *= cfg.BALL_AIR_DRAG;
-      this.vel.y *= cfg.BALL_AIR_DRAG;
+      // Horizontal air drag: per-second coefficient, properly dt-scaled.
+      const airDragMul = Math.pow(cfg.BALL_AIR_DRAG, dt);
+      this.vel.x *= airDragMul;
+      this.vel.y *= airDragMul;
     }
 
     // ── Integrate position ───────────────────────────────────────────────
@@ -34,12 +34,10 @@ export class Ball {
       }
     }
 
-    // ── Rolling friction (only on the ground, multiplicative & dt-scaled) ─
-    // Multiplier is raised to the power of (dt * SIMULATION_HZ) so the result
-    // is identical regardless of whether it's called once at 120 Hz or
-    // composed across variable-length steps.
+    // ── Rolling friction (only on the ground, per-second, dt-scaled) ──────
+    // BALL_FRICTION is now a per-second multiplier (e.g. 0.965 = lose 3.5%/s).
     if (this.pos.z <= 0) {
-      const frictionMul = Math.pow(cfg.BALL_FRICTION, dt * cfg.SIMULATION_HZ);
+      const frictionMul = Math.pow(cfg.BALL_FRICTION, dt);
       this.vel.x *= frictionMul;
       this.vel.y *= frictionMul;
     }

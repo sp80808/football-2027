@@ -103,7 +103,7 @@ export class Keeper {
     this.diveTimer -= dt;
     if (this.diveTimer <= 0) {
       this.aiState = 'recovering';
-      this.diveTimer = cfg.KEEPER_DIVE_DURATION; // reuse as recovery timer
+      this.diveTimer = cfg.KEEPER_RECOVER_DURATION;
     }
   }
 
