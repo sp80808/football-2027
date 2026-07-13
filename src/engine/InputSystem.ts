@@ -82,22 +82,31 @@ export class InputSystem {
       switchPlayer = gp.buttons[4]?.pressed || false; // LB
     } else {
       // KB mapping
-      if (this.keys['ArrowUp'] || this.keys['KeyW']) ls.y += 1;
-      if (this.keys['ArrowDown'] || this.keys['KeyS']) ls.y -= 1;
-      if (this.keys['ArrowLeft'] || this.keys['KeyA']) ls.x -= 1;
+      // Movement: WASD + Arrow Keys
+      if (this.keys['ArrowUp']    || this.keys['KeyW']) ls.y += 1;
+      if (this.keys['ArrowDown']  || this.keys['KeyS']) ls.y -= 1;
+      if (this.keys['ArrowLeft']  || this.keys['KeyA']) ls.x -= 1;
       if (this.keys['ArrowRight'] || this.keys['KeyD']) ls.x += 1;
       if (ls.magSq() > 1) ls.normalize();
 
+      // Modifiers
       if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) sprint = 1;
-      if (this.keys['ControlLeft']) shield = 1;
+      if (this.keys['ControlLeft'] || this.keys['ControlRight']) shield = 1;
 
-      pass = this.keys['Space'] || this.keys['KeyJ'];
-      shoot = this.keys['KeyK'];
-      throughPass = this.keys['KeyI'];
-      tackle = this.keys['KeyJ'];
-      slide = this.keys['KeyK'];
-      switchPlayer = this.keys['KeyQ'];
-      keeperRush = this.keys['KeyE'];
+      // Actions — no conflicts:
+      // F = short pass / chip    Space = short pass (alternative)
+      // G = shoot                Enter = shoot (alternative)
+      // R = through pass
+      // T = tackle
+      // Q = switch player
+      // E = keeper rush
+      pass        = !!(this.keys['KeyF'] || this.keys['Space']);
+      shoot       = !!(this.keys['KeyG'] || this.keys['Enter']);
+      throughPass = !!(this.keys['KeyR']);
+      tackle      = !!(this.keys['KeyT']);
+      slide       = false; // reserved for future
+      switchPlayer = !!(this.keys['KeyQ']);
+      keeperRush  = !!(this.keys['KeyE']);
     }
 
     this.currentFrame.leftStick.copy(ls);

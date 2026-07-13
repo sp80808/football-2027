@@ -97,36 +97,51 @@ export class Player {
     }
 
     // ── Charge management ─────────────────────────────────────────────────
-    const isShootAction = intent.action === 'shot';
-    const isPassAction =
-      intent.action === 'short_pass' ||
-      intent.action === 'through_pass' ||
-      intent.action === 'long_pass';
+    // Use raw frame so we can distinguish held vs released without losing
+    // the charge the moment the intent parser sees 'none' on a frame boundary.
+    const shootHeld    = input.shootHeld || input.shootPressed;
+    const passHeld     = input.passHeld  || input.passPressed;
+    const throughHeld  = input.throughPassHeld || input.throughPassPressed;
+    const shootReleased = input.shootReleased;
+    const passReleased  = input.passReleased || input.throughPassReleased;
 
-    if (!this.isCharging && (isShootAction || isPassAction)) {
-      this.isCharging = true;
-      this.chargeType = isShootAction ? 'shoot' : 'pass';
-      this.chargeStart = 0;
+    // Start charge on first held frame
+    if (!this.isCharging) {
+      if (shootHeld) {
+        this.isCharging = true;
+        this.chargeType = 'shoot';
+        this.chargeStart = 0;
+      } else if (passHeld || throughHeld) {
+        this.isCharging = true;
+        this.chargeType = 'pass';
+        this.chargeStart = 0;
+      }
     }
 
+    // Accumulate charge while button held
     if (this.isCharging) {
       this.chargeStart += dt;
       if (this.chargeStart > cfg.MAX_CHARGE_TIME) this.chargeStart = cfg.MAX_CHARGE_TIME;
     }
 
     // ── Kick on release ───────────────────────────────────────────────────
-    const releasing =
-      (isShootAction && this.chargeType === 'shoot') ||
-      (isPassAction && this.chargeType === 'pass');
+    const shouldKick =
+      (this.chargeType === 'shoot' && shootReleased) ||
+      (this.chargeType === 'pass'  && passReleased);
 
-    if (releasing && this.isCharging && intent.action !== 'none') {
+    if (shouldKick && this.isCharging) {
       if (this.controlState === 'under_control' || this.controlState === 'loose_nearby') {
         const power =
           this.chargeType === 'shoot' ? cfg.SHOT_POWER_BASE : cfg.PASS_POWER_BASE;
         const multiplier = Math.max(cfg.MIN_CHARGE_FRACTION, this.chargeStart / cfg.MAX_CHARGE_TIME);
-        const kickDir = this.facing.clone();
-        const lift = this.chargeType === 'shoot' ? 3.0 * multiplier : 0.5 * multiplier;
 
+        // Through-pass gets extra loft; shoot gets more lift at full charge.
+        const isThrough = throughHeld && this.chargeType === 'pass';
+        const lift = this.chargeType === 'shoot'
+          ? 3.0 * multiplier
+          : isThrough ? 2.5 * multiplier : 0.5 * multiplier;
+
+        const kickDir = this.facing.clone();
         ball.kick(
           new Vec3(
             kickDir.x * power * multiplier,
@@ -135,12 +150,6 @@ export class Player {
           ),
         );
       }
-      this.isCharging = false;
-      this.chargeStart = 0;
-    }
-
-    // Cancel charge if no action input
-    if (this.isCharging && intent.action === 'none') {
       this.isCharging = false;
       this.chargeStart = 0;
     }
