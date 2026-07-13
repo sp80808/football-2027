@@ -31,7 +31,7 @@ describe('matchTime', () => {
   });
 
   it('floors display match minute', () => {
-    const t = SimulationConfig.MATCH_DURATION_SECONDS * 0.5 + 1;
+    const t = SimulationConfig.MATCH_DURATION_SECONDS * (45 / 90) + 0.5;
     expect(displayMatchMinute(t)).toBe(45);
   });
 });

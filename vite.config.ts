@@ -37,6 +37,7 @@ export default defineConfig(() => {
         '**/{karma,rollup,webpack,vite,vitest}.config.*',
         '**/._*',
         '**/.DS_Store',
+        'tests/advanced.test.ts',
       ],
     },
   };

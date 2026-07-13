@@ -63,6 +63,9 @@ importers:
       '@types/node':
         specifier: ^22.14.0
         version: 22.20.1
+      '@types/stats.js':
+        specifier: ^0.17.4
+        version: 0.17.4
       '@types/three':
         specifier: ^0.185.1
         version: 0.185.1
@@ -72,6 +75,9 @@ importers:
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
+      stats.js:
+        specifier: ^0.17.0
+        version: 0.17.0
       tailwindcss:
         specifier: ^4.1.14
         version: 4.3.2

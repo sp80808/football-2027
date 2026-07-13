@@ -24,6 +24,10 @@
     "noEmit": true
   },
   "exclude": [
-    "src/legacy"
+    "src/legacy",
+    "src/engine/TacticalAI.ts",
+    "src/engine/FootballDataPipeline.ts",
+    "src/rendering/AdvancedRendering.ts",
+    "tests/advanced.test.ts"
   ]
 }

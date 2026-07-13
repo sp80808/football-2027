@@ -58,7 +58,6 @@ export class Player {
   jumpVelocity = 0;
   isJumping = false;
   jumpTimer = 0;
-}
 
   update(dt: number, input: ControllerFrame, ball: Ball) {
     const intent = parseIntent(input, {
