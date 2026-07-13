@@ -28,7 +28,7 @@ Align the editable Football 2027 Figma work with the actual React/Three.js codeb
 2. `MainMenuScreen`, `QuickMatchScreen`, `CareerScreen`, `SettingsScreen` and `GameplayScreen` exist but are not wired into the active app shell.
 3. The latest Vercel status is failing.
 4. `src/audio/AudioManager.ts` imports `howler`, but `howler` is not declared in `package.json`.
-5. `src/store/gameStore.ts` imports `../engine/MatchManager`, while the repository contains `MatchState.ts` instead.
+5. `MatchState.ts` and `MatchManager.ts` now coexist with incompatible phase vocabularies and state shapes. One authoritative match-flow model must be selected.
 6. `GameplayScreen` renders `HUD` without the currently required WASM props.
 7. The current Figma file uses editable frames and hardcoded paints rather than local token collections and component sets.
 8. Several Figma concepts have no stable one-to-one code component yet, so Code Connect mappings must wait until extraction is complete.
@@ -203,7 +203,7 @@ Tailwind utilities may consume these variables, but the variable names remain st
 ### Tranche 0 — restore build health
 
 - resolve the missing audio dependency or replace Howler with Web Audio
-- correct the invalid match-state import
+- consolidate `MatchState.ts` and `MatchManager.ts` into one authoritative match-flow model
 - reconcile `GameplayScreen` and `HUD` props
 - add a real CI workflow that runs typecheck, tests and build
 
