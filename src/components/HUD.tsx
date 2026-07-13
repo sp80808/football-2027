@@ -1,31 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Zap,
+  Activity,
   ArrowUp,
   ChevronsUp,
-  Shield,
+  Cpu,
   Crosshair,
   Footprints,
   GitBranch,
   RefreshCw,
-  Activity,
-  Cpu,
+  Settings,
+  Shield,
+  Sparkles,
+  Target,
   Volume2,
   VolumeX,
-  Settings,
   Wind,
-  Target,
-  Sparkles,
-  Clock,
+  Zap,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { GameEngine } from '../engine/GameEngine';
 import { SimulationConfig } from '../engine/SimulationConfig';
-import { useGameStore, PlayEvent } from '../store/gameStore';
+import { useGameStore } from '../store/gameStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { modifierLabel } from '../engine/PlayerIntentParser';
 import type { PassModifier, ShotModifier } from '../engine/Intent';
-import { formatBroadcastClock, getPeriodLabel } from '../utils/matchTime';
+import { BroadcastHUD } from './broadcast/BroadcastHUD';
 
 interface HUDProps {
   engine: GameEngine;
@@ -64,49 +63,11 @@ function StatRow({ label, value, accent = 'text-white' }: { label: string; value
   );
 }
 
-function PlayEventChip({ event, align }: { event: PlayEvent; align: 'left' | 'right' }) {
-  const isHome = event.side === 'home';
-  const accent = event.kind === 'offside'
-    ? 'border-amber-500/35 bg-amber-500/15 text-amber-200'
-    : isHome
-      ? 'border-emerald-500/35 bg-emerald-500/15 text-emerald-200'
-      : 'border-red-500/35 bg-red-500/15 text-red-200';
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, x: align === 'left' ? -24 : 24, y: 8 }}
-      animate={{ opacity: 1, x: 0, y: 0 }}
-      exit={{ opacity: 0, x: align === 'left' ? -16 : 16 }}
-      transition={{ duration: 0.28, ease: 'easeOut' }}
-      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 backdrop-blur-sm ${accent} ${align === 'right' ? 'flex-row-reverse' : ''}`}
-    >
-      <span className="flex items-center gap-1 font-mono text-[10px] tabular-nums text-white/55">
-        <Clock size={10} className="shrink-0 opacity-70" />
-        {`${event.matchMinute}'`}
-      </span>
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-white/95">{event.label}</span>
-    </motion.div>
-  );
-}
-
-function PlayEventFeed({ side, align }: { side: 'home' | 'away'; align: 'left' | 'right' }) {
-  const events = useGameStore((s) => s.playEvents.filter((e) => e.side === side));
-
-  return (
-    <div className={`pointer-events-none absolute bottom-4 z-10 flex max-w-[min(220px,42vw)] flex-col gap-1.5 select-none ${align === 'left' ? 'left-3 sm:left-4' : 'right-3 sm:right-4 items-end'}`}>
-      <AnimatePresence mode="popLayout">
-        {events.map((event) => (
-          <PlayEventChip key={event.id} event={event} align={align} />
-        ))}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = false, onToggleOffsideLine }: HUDProps) {
-  const { audioEnabled, toggleAudio, homeScore, awayScore, elapsedSeconds, phase, announcement, half } = useGameStore();
+  const audioEnabled = useGameStore((state) => state.audioEnabled);
+  const toggleAudio = useGameStore((state) => state.toggleAudio);
   const { showControlHints, setSettingsOpen, activeModifierLabel, flashModifierLabel } = useSettingsStore();
+  const reduceMotion = useReducedMotion();
   const [diagnostics, setDiagnostics] = useState({
     tps: 0,
     fps: 0,
@@ -119,9 +80,6 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
     chargePercent: 0,
     passModifier: 'none' as string,
     shotModifier: 'none' as string,
-    scorePlayer: 0,
-    scoreOpponent: 0,
-    matchSeconds: 0,
     celebrating: false,
     offsideLine: null as number | null,
   });
@@ -133,7 +91,7 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
     let animationFrame = 0;
 
     const countFrame = () => {
-      frames++;
+      frames += 1;
       const now = performance.now();
       if (now - lastFpsTime >= 1000) {
         fps = frames;
@@ -158,28 +116,16 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
         chargePercent: Math.min(100, Math.round((state.player.chargeStart / SimulationConfig.MAX_CHARGE_TIME) * 100)),
         passModifier: state.player.passModifier,
         shotModifier: state.player.shotModifier,
-        scorePlayer: state.scorePlayer,
-        scoreOpponent: state.scoreOpponent,
-        matchSeconds: engine.elapsedSeconds,
         celebrating: engine.isGoalCelebration,
         offsideLine: state.offsideLineY,
       });
-    }, 80);
+    }, 100);
 
     return () => {
       window.clearInterval(interval);
       cancelAnimationFrame(animationFrame);
     };
-  }, [engine, flashModifierLabel]);
-
-  const periodLabel =
-    phase === 'halftime'
-      ? 'HALF TIME'
-      : phase === 'full_time'
-        ? 'FULL TIME'
-        : phase === 'kickoff' && half === 2
-          ? '2ND HALF'
-          : getPeriodLabel(elapsedSeconds);
+  }, [engine]);
 
   useEffect(() => {
     if (!diagnostics.charging) return;
@@ -195,11 +141,10 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
     if (diagnostics.chargeType === 'shoot') {
       if (diagnostics.shotModifier === 'finesse') return 'bg-gradient-to-r from-purple-400 to-fuchsia-500';
       if (diagnostics.shotModifier === 'chip') return 'bg-gradient-to-r from-yellow-300 to-amber-400';
-      if (diagnostics.shotModifier === 'low_driven') return 'bg-gradient-to-r from-orange-400 to-red-500';
       return 'bg-gradient-to-r from-orange-400 to-red-500';
     }
     if (diagnostics.passModifier === 'through') return 'bg-gradient-to-r from-emerald-400 to-green-500';
-    if (diagnostics.passModifier === 'lob') return 'bg-gradient-to-r from-cyan-400 to-sky-400';
+    if (diagnostics.passModifier === 'lob' || diagnostics.passModifier === 'lob_through') return 'bg-gradient-to-r from-cyan-400 to-sky-400';
     if (diagnostics.passModifier === 'driven') return 'bg-gradient-to-r from-blue-300 to-indigo-400';
     return 'bg-gradient-to-r from-blue-400 to-cyan-400';
   };
@@ -221,106 +166,90 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
 
   return (
     <>
-      {showControlHints && (
-      <div className="pointer-events-none absolute bottom-28 left-3 sm:bottom-32 sm:left-4 select-none">
-        <div className="min-w-[220px] rounded-xl border border-white/10 bg-black/60 p-3 backdrop-blur-sm">
-          <p className="mb-2 px-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/40">Controls</p>
-          <ul className="space-y-1.5">
-            <ControlRow label="Move" icon={<ArrowUp size={12} />} keys={['W', 'A', 'S', 'D']} />
-            <ControlRow label="Sprint" icon={<ChevronsUp size={12} />} keys={['Shift']} />
-            <ControlRow label="Shield" icon={<Shield size={12} />} keys={['Ctrl']} />
-            <div className="my-1 border-t border-white/10" />
-            <ControlRow label="Pass" icon={<Footprints size={12} />} keys={['F', 'Space']} />
-            <ControlRow label="Shoot" icon={<Crosshair size={12} />} keys={['G', 'Enter']} />
-            <ControlRow label="Through" icon={<GitBranch size={12} />} keys={['R']} />
-            <ControlRow label="Lob" icon={<Wind size={12} />} keys={['E']} />
-            <ControlRow label="Finesse" icon={<Target size={12} />} keys={['Q']} />
-            <ControlRow label="Chip" icon={<Sparkles size={12} />} keys={['Alt']} />
-            <ControlRow label="Skill" icon={<Sparkles size={12} />} keys={['C']} />
-            <ControlRow label="Tackle" icon={<Zap size={12} />} keys={['T']} />
-            <ControlRow label="Slide" icon={<Zap size={12} />} keys={['X', 'Shift+T']} />
-          </ul>
-          <p className="mt-2 text-[10px] leading-tight text-white/30">Hold to charge. Tap shoot twice for low driven.</p>
-        </div>
-      </div>
-      )}
+      <BroadcastHUD celebrating={diagnostics.celebrating} />
 
-      <PlayEventFeed side="home" align="left" />
-      <PlayEventFeed side="away" align="right" />
-
-      <div className="pointer-events-none absolute left-3 top-3 z-20 select-none sm:left-4 sm:top-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-3 rounded-xl border border-white/15 bg-black/70 px-3 py-2 shadow-lg backdrop-blur-md sm:gap-4 sm:px-4">
-            <span className="min-w-[1.25rem] text-center font-mono text-2xl font-black tabular-nums leading-none text-emerald-300">
-              {homeScore}
-            </span>
-            <span className="text-white/25">|</span>
-            <div className="flex min-w-[3.5rem] flex-col items-center">
-              <span className="font-mono text-sm font-bold tabular-nums tracking-tight text-white">
-                {formatBroadcastClock(elapsedSeconds)}
-              </span>
-              <span className="text-[8px] font-semibold uppercase tracking-[0.2em] text-white/40">
-                {periodLabel}
-              </span>
+      <AnimatePresence initial={false}>
+        {showControlHints && (
+          <motion.div
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -16 }}
+            className="pointer-events-none absolute bottom-28 left-3 select-none sm:bottom-32 sm:left-4"
+          >
+            <div className="min-w-[220px] rounded-sm border border-white/10 bg-black/72 p-3 shadow-xl backdrop-blur-md">
+              <p className="mb-2 px-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/40">Controls</p>
+              <ul className="space-y-1.5">
+                <ControlRow label="Move" icon={<ArrowUp size={12} />} keys={['W', 'A', 'S', 'D']} />
+                <ControlRow label="Sprint" icon={<ChevronsUp size={12} />} keys={['Shift']} />
+                <ControlRow label="Shield" icon={<Shield size={12} />} keys={['Ctrl']} />
+                <div className="my-1 border-t border-white/10" />
+                <ControlRow label="Pass" icon={<Footprints size={12} />} keys={['F', 'Space']} />
+                <ControlRow label="Shoot" icon={<Crosshair size={12} />} keys={['G', 'Enter']} />
+                <ControlRow label="Through" icon={<GitBranch size={12} />} keys={['R']} />
+                <ControlRow label="Lob" icon={<Wind size={12} />} keys={['E']} />
+                <ControlRow label="Finesse" icon={<Target size={12} />} keys={['Q']} />
+                <ControlRow label="Chip" icon={<Sparkles size={12} />} keys={['Alt']} />
+                <ControlRow label="Skill" icon={<Sparkles size={12} />} keys={['C']} />
+                <ControlRow label="Tackle" icon={<Zap size={12} />} keys={['T']} />
+                <ControlRow label="Slide" icon={<Zap size={12} />} keys={['X', 'Shift+T']} />
+              </ul>
+              <p className="mt-2 text-[10px] leading-tight text-white/30">Hold to charge. Tap shoot twice for low driven.</p>
             </div>
-            <span className="text-white/25">|</span>
-            <span className="min-w-[1.25rem] text-center font-mono text-2xl font-black tabular-nums leading-none text-red-300">
-              {awayScore}
-            </span>
-          </div>
-          {announcement && (
-            <span className="w-fit rounded-full border border-amber-500/30 bg-amber-500/20 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">
-              {announcement}
-            </span>
-          )}
-          {diagnostics.celebrating && !announcement && (
-            <span className="w-fit rounded-full border border-amber-500/30 bg-amber-500/20 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">
-              Goal — kick-off soon
-            </span>
-          )}
-        </div>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {diagnostics.charging && (
-        <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 select-none">
-          <div className={`min-w-[180px] rounded-lg border px-4 py-2 backdrop-blur-sm ${diagnostics.chargeType === 'shoot' && diagnostics.shotModifier === 'power' ? 'border-red-400/40 bg-black/80 shadow-[0_0_24px_rgba(239,68,68,0.25)]' : 'border-white/10 bg-black/70'}`}>
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[11px] font-medium capitalize text-white/60">
-                {diagnostics.chargeType === 'shoot' ? 'Shooting' : 'Passing'}
-              </span>
-              <span className="font-mono text-[11px] font-bold text-white/80">
-                {diagnostics.chargePercent}%
-              </span>
+      <AnimatePresence initial={false}>
+        {diagnostics.charging && (
+          <motion.div
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.96 }}
+            className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 select-none"
+          >
+            <div className={`min-w-[190px] rounded-sm border px-4 py-2 shadow-xl backdrop-blur-md ${diagnostics.chargeType === 'shoot' && diagnostics.shotModifier === 'power' ? 'border-red-400/40 bg-black/85 shadow-[0_0_24px_rgba(239,68,68,0.25)]' : 'border-white/10 bg-black/75'}`}>
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/60">
+                  {diagnostics.chargeType === 'shoot' ? 'Shot power' : 'Pass power'}
+                </span>
+                <span className="font-mono text-[11px] font-bold text-white/85">{diagnostics.chargePercent}%</span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden bg-white/10">
+                <motion.div
+                  className={`h-full ${chargeBarClass()}`}
+                  animate={{ width: `${diagnostics.chargePercent}%` }}
+                  transition={{ duration: 0.05, ease: 'linear' }}
+                />
+              </div>
             </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
-              <div
-                className={`h-full rounded-full ${chargeBarClass()}`}
-                style={{ width: `${diagnostics.chargePercent}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {activeModifierLabel && (
-        <div className="pointer-events-none absolute left-1/2 top-24 -translate-x-1/2 select-none">
-          <span className="rounded-full border border-white/20 bg-black/70 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-white/90 backdrop-blur-sm">
-            {activeModifierLabel}
-          </span>
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {activeModifierLabel && (
+          <motion.div
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.94 }}
+            className="pointer-events-none absolute left-1/2 top-20 -translate-x-1/2 select-none"
+          >
+            <span className="rounded-sm border border-white/20 bg-black/80 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white/90 shadow-xl backdrop-blur-md">
+              {activeModifierLabel}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="pointer-events-none absolute right-3 top-3 select-none sm:right-4 sm:top-4">
-        <div className="min-w-[190px] rounded-xl border border-white/10 bg-black/60 p-3 backdrop-blur-sm">
+        <div className="min-w-[190px] rounded-sm border border-white/10 bg-black/68 p-3 shadow-xl backdrop-blur-md">
           <p className="mb-2 px-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/40">Diagnostics</p>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
             <StatRow label="FPS" value={diagnostics.fps} accent="text-green-400" />
             <StatRow label="TPS" value={diagnostics.tps} accent="text-blue-400" />
             <StatRow label="Player" value={`${diagnostics.playerSpeed} m/s`} />
             <StatRow label="Ball" value={`${diagnostics.ballVelocity} m/s`} />
-            {diagnostics.offsideLine !== null && (
-              <StatRow label="Offside" value={`${diagnostics.offsideLine.toFixed(1)}m`} accent="text-amber-300" />
-            )}
+            {diagnostics.offsideLine !== null && <StatRow label="Offside" value={`${diagnostics.offsideLine.toFixed(1)}m`} accent="text-amber-300" />}
           </div>
           <div className="mt-2.5 flex items-center gap-2">
             <Activity size={11} className="shrink-0 text-white/30" />
@@ -339,34 +268,22 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
 
       <div className="pointer-events-auto absolute right-3 top-[9.5rem] z-10 flex flex-col gap-2 select-none sm:right-4 sm:top-[10rem]">
         {onToggleWasm && (
-          <button
-            onClick={onToggleWasm}
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/60 px-3 py-1.5 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/10"
-          >
+          <button onClick={onToggleWasm} className="flex items-center gap-2 rounded-sm border border-white/10 bg-black/68 px-3 py-1.5 text-[11px] font-medium text-white shadow-lg backdrop-blur-md transition-colors hover:bg-white/10">
             <Cpu size={12} />
             <span>Sim: <span className={useWasm ? 'text-amber-300' : 'text-blue-300'}>{useWasm ? 'WASM' : 'TypeScript'}</span></span>
             <RefreshCw size={11} className="text-white/40" />
           </button>
         )}
-        <button
-          onClick={() => setSettingsOpen(true)}
-          className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/60 px-3 py-1.5 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/10"
-        >
+        <button onClick={() => setSettingsOpen(true)} className="flex items-center gap-2 rounded-sm border border-white/10 bg-black/68 px-3 py-1.5 text-[11px] font-medium text-white shadow-lg backdrop-blur-md transition-colors hover:bg-white/10">
           <Settings size={12} />
           <span>Settings</span>
         </button>
-        <button
-          onClick={toggleAudio}
-          className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/60 px-3 py-1.5 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/10"
-        >
+        <button onClick={toggleAudio} className="flex items-center gap-2 rounded-sm border border-white/10 bg-black/68 px-3 py-1.5 text-[11px] font-medium text-white shadow-lg backdrop-blur-md transition-colors hover:bg-white/10">
           {audioEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
           <span>{audioEnabled ? 'Sound On' : 'Sound Off'}</span>
         </button>
         {onToggleOffsideLine && (
-          <button
-            onClick={onToggleOffsideLine}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[11px] font-medium backdrop-blur-sm transition-colors hover:bg-white/10 ${showOffsideLine ? 'border-amber-500/30 bg-amber-500/15 text-amber-200' : 'border-white/10 bg-black/60 text-white'}`}
-          >
+          <button onClick={onToggleOffsideLine} className={`flex items-center gap-2 rounded-sm border px-3 py-1.5 text-[11px] font-medium shadow-lg backdrop-blur-md transition-colors hover:bg-white/10 ${showOffsideLine ? 'border-amber-500/30 bg-amber-500/15 text-amber-200' : 'border-white/10 bg-black/68 text-white'}`}>
             <Target size={12} />
             <span>Offside Line</span>
           </button>
