@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React, { useEffect, useState } from 'react';
+import { hasSeenSplash } from './input/useInputDevice';
 import { SplashScreen } from './screens/SplashScreen';
 import { MainMenuScreen } from './screens/MainMenuScreen';
 import { QuickMatchScreen } from './screens/QuickMatchScreen';
@@ -15,7 +16,7 @@ type Screen = 'splash' | 'mainMenu' | 'quickMatch' | 'career' | 'settings' | 'ga
 type GameplaySource = 'quickMatch' | 'career';
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('splash');
+  const [screen, setScreen] = useState<Screen>(() => (hasSeenSplash() ? 'mainMenu' : 'splash'));
   const [matchSession, setMatchSession] = useState(0);
   const [gameplaySource, setGameplaySource] = useState<GameplaySource>('quickMatch');
 

@@ -224,29 +224,11 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
 
   return (
     <>
-      {showControlHints && (
-      <div className="pointer-events-none absolute bottom-28 left-3 sm:bottom-32 sm:left-4 select-none">
-        <div className="min-w-[220px] rounded-xl border border-white/10 bg-black/60 p-3 backdrop-blur-sm">
-          <p className="mb-2 px-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/40">Controls</p>
-          <ul className="space-y-1.5">
-            <ControlRow label="Move" icon={<ArrowUp size={12} />} keys={['W', 'A', 'S', 'D']} />
-            <ControlRow label="Sprint" icon={<ChevronsUp size={12} />} keys={['Shift']} />
-            <ControlRow label="Shield" icon={<Shield size={12} />} keys={['Ctrl']} />
-            <div className="my-1 border-t border-white/10" />
-            <ControlRow label="Pass" icon={<Footprints size={12} />} keys={['F', 'Space']} />
-            <ControlRow label="Shoot" icon={<Crosshair size={12} />} keys={['G', 'Enter']} />
-            <ControlRow label="Through" icon={<GitBranch size={12} />} keys={['R']} />
-            <ControlRow label="Lob" icon={<Wind size={12} />} keys={['E']} />
-            <ControlRow label="Finesse" icon={<Target size={12} />} keys={['Q']} />
-            <ControlRow label="Chip" icon={<Sparkles size={12} />} keys={['Alt']} />
-            <ControlRow label="Skill" icon={<Sparkles size={12} />} keys={['C']} />
-            <ControlRow label="Tackle" icon={<Zap size={12} />} keys={['T']} />
-            <ControlRow label="Slide" icon={<Zap size={12} />} keys={['X', 'Shift+T']} />
-          </ul>
-          <p className="mt-2 text-[10px] leading-tight text-white/30">Hold to charge. Tap shoot twice for low driven.</p>
+            {showControlHints && (
+        <div className="pointer-events-none absolute bottom-28 left-3 select-none sm:bottom-32 sm:left-4">
+          <ControlBindingsPanel compact className="min-w-[220px] border-border bg-surface-hud" />
         </div>
-      </div>
-      )}
+      )
 
       <PlayEventFeed side="home" align="left" />
       <PlayEventFeed side="away" align="right" />

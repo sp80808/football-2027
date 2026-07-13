@@ -1,0 +1,12 @@
+export const MOTION = { fast: 150, normal: 280, slow: 400 } as const;
+export const ICON = { strokeWidth: 1.75, size: { xs: 12, sm: 16, md: 20, lg: 24 } } as const;
+export type IconSize = keyof typeof ICON.size;
+export function iconProps(size: IconSize = "sm") { return { size: ICON.size[size], strokeWidth: ICON.strokeWidth } as const; }
+export const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+export const GLASS = { base: "border border-border bg-surface-hud backdrop-blur-[var(--blur-glass)]", elevated: "border border-border-strong bg-surface-elevated backdrop-blur-[var(--blur-glass-md)] shadow-glass", overlay: "border border-border-strong bg-surface-overlay backdrop-blur-[var(--blur-glass-md)] shadow-glass-lg", hud: "border border-border bg-surface-hud backdrop-blur-[var(--blur-glass)]" } as const;
+export const GLYPH_PILL = "inline-flex min-h-[22px] min-w-[22px] items-center justify-center rounded-md border border-border-strong bg-white/10 px-1.5 font-bold leading-none text-text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]";
+export const TYPO = { sectionLabel: "text-[10px] font-semibold uppercase tracking-widest text-text-muted", heading: "text-sm font-bold uppercase tracking-wider text-text-primary", caption: "text-[10px] text-text-muted", score: "font-score font-black tabular-nums", clock: "font-score font-bold tabular-nums tracking-tight" } as const;
+export const ACCENT = { player: "text-accent-player", playerSurface: "border-accent-player-border bg-accent-player-bg text-accent-player", opponent: "text-accent-opponent", opponentSurface: "border-accent-opponent-border bg-accent-opponent-bg text-accent-opponent", action: "text-accent-action", actionSurface: "border-accent-action-border bg-accent-action-bg text-accent-action", warning: "text-accent-warning", warningSurface: "border-accent-warning-border bg-accent-warning-bg text-accent-warning" } as const;
+export type TeamSide = "player" | "opponent" | "neutral" | "warning";
+export function teamAccent(side: TeamSide): string { switch (side) { case "player": return ACCENT.playerSurface; case "opponent": return ACCENT.opponentSurface; case "warning": return ACCENT.warningSurface; default: return "border-border bg-white/5 text-text-secondary"; } }
+export function cn(...parts: Array<string | false | null | undefined>): string { return parts.filter(Boolean).join(" "); }

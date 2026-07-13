@@ -1,93 +1,38 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { MenuBackdrop } from '../components/MenuBackdrop';
-import { markSplashSeen, preloadGameAssets } from '../input/useInputDevice';
+import { motionTransition, scaleIn, springSmooth, useReducedMotion } from '../ui/motionPresets';
 
-interface SplashScreenProps {
-  onStart: () => void;
-}
-
+interface SplashScreenProps { onStart: () => void; }
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onStart }) => {
+  const reduced = useReducedMotion();
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
-
-  const finish = useCallback(() => {
-    markSplashSeen();
-    onStart();
-  }, [onStart]);
-
   useEffect(() => {
-    let cancelled = false;
-    preloadGameAssets((p) => {
-      if (!cancelled) setProgress(p);
-    }).then(() => {
-      if (!cancelled) setReady(true);
-    });
-    return () => {
-      cancelled = true;
-    };
+    const start = performance.now(); const duration = 2200; let frame = 0;
+    const tick = (now: number) => { const p = Math.min(1, (now - start) / duration); setProgress(p); if (p < 1) frame = requestAnimationFrame(tick); else setReady(true); };
+    frame = requestAnimationFrame(tick); return () => cancelAnimationFrame(frame);
   }, []);
-
   useEffect(() => {
     if (!ready) return;
-    const handleStart = () => finish();
-    window.addEventListener('keydown', handleStart);
-    window.addEventListener('click', handleStart);
-    return () => {
-      window.removeEventListener('keydown', handleStart);
-      window.removeEventListener('click', handleStart);
-    };
-  }, [ready, finish]);
-
+    const handleStart = () => onStart();
+    window.addEventListener('keydown', handleStart); window.addEventListener('click', handleStart);
+    return () => { window.removeEventListener('keydown', handleStart); window.removeEventListener('click', handleStart); };
+  }, [onStart, ready]);
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.45 }}
-      className="relative flex h-screen w-screen flex-col items-center justify-center overflow-hidden bg-surface"
-    >
-      <MenuBackdrop />
-
-      <div className="pointer-events-none absolute top-1/2 left-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-action-bg blur-[120px]" />
-
-      <motion.div
-        initial={{ scale: 0.88, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 1.1, ease: 'easeOut' }}
-        className="z-10 flex flex-col items-center"
-      >
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-accent-player-border bg-accent-player-bg shadow-glass">
-          <span className="text-2xl font-black text-accent-player">27</span>
-        </div>
-        <h1 className="mb-2 bg-gradient-to-r from-accent-action via-accent-player to-accent-action bg-clip-text text-5xl font-black tracking-tighter text-transparent md:text-7xl">
-          FOOTBALL 2027
-        </h1>
-        <p className="text-sm font-semibold uppercase tracking-[0.35em] text-text-muted">Broadcast Simulation</p>
+    <div className="relative flex h-screen w-screen flex-col items-center justify-center overflow-hidden bg-slate-950">
+      <div className="absolute top-1/2 left-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-600/20 blur-[120px]" />
+      <motion.div initial={scaleIn.initial} animate={scaleIn.animate} transition={motionTransition(reduced, { ...springSmooth, duration: reduced ? 0.01 : 1.1 })} className="z-10 flex flex-col items-center">
+        <h1 className="mb-2 bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-6xl font-black tracking-tighter text-transparent md:text-8xl">FOOTBALL 2027</h1>
+        <p className="mb-12 text-sm font-semibold uppercase tracking-widest text-slate-400">Next Generation Simulation</p>
       </motion.div>
-
-      <div className="absolute bottom-24 z-10 w-full max-w-xs px-6">
-        <div className="mb-2 flex justify-between text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-          <span>{ready ? 'Ready' : 'Loading assets'}</span>
-          <span>{Math.round(progress * 100)}%</span>
+      <div className="absolute bottom-24 z-10 w-[min(320px,80vw)]">
+        <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+          <motion.div className="relative h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-400" style={{ width: `${progress * 100}%` }}>
+            {!reduced && (<motion.span className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/50 to-transparent" animate={{ x: ['-100%', '320%'] }} transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }} />)}
+          </motion.div>
         </div>
-        <div className="h-1 overflow-hidden rounded-full bg-white/10">
-          <motion.div
-            className="h-full rounded-full bg-gradient-to-r from-accent-action to-accent-player"
-            initial={{ width: '0%' }}
-            animate={{ width: `${Math.max(progress * 100, ready ? 100 : 8)}%` }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-          />
-        </div>
+        <motion.p animate={ready ? { opacity: [0.35, 1, 0.35] } : { opacity: 0.5 }} transition={{ duration: 2, repeat: ready ? Infinity : 0, ease: 'easeInOut' }} className="cursor-pointer text-center text-lg font-bold uppercase tracking-widest text-blue-200/80">{ready ? 'Press any key to start' : 'Loading…'}</motion.p>
       </div>
-
-      <motion.p
-        animate={{ opacity: ready ? [0.4, 1, 0.4] : 0.35 }}
-        transition={{ duration: 2, repeat: ready ? Infinity : 0, ease: 'easeInOut' }}
-        className="absolute bottom-10 z-10 cursor-pointer text-sm font-bold uppercase tracking-widest text-accent-action"
-      >
-        {ready ? 'Press any key to continue' : 'Preparing match engine…'}
-      </motion.p>
-    </motion.div>
+    </div>
   );
 };
