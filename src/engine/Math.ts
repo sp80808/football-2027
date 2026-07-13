@@ -94,11 +94,39 @@ export class Vec3 {
     return this;
   }
 
+  sub(v: Vec3) {
+    this.x -= v.x;
+    this.y -= v.y;
+    this.z -= v.z;
+    return this;
+  }
+
   mul(s: number) {
     this.x *= s;
     this.y *= s;
     this.z *= s;
     return this;
+  }
+
+  div(s: number) {
+    if (s !== 0) {
+      this.x /= s;
+      this.y /= s;
+      this.z /= s;
+    }
+    return this;
+  }
+
+  cross(v: Vec3) {
+    return new Vec3(
+      this.y * v.z - this.z * v.y,
+      this.z * v.x - this.x * v.z,
+      this.x * v.y - this.y * v.x,
+    );
+  }
+
+  clone() {
+    return new Vec3(this.x, this.y, this.z);
   }
 
   magSq() {

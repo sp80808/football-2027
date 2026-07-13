@@ -50,7 +50,7 @@ describe('math and ball physics', () => {
     const ball = new Ball();
     ball.pos.set(0, 0, 5);
     for (let tick = 0; tick < 1200; tick++) ball.update(1 / 120);
-    expect(ball.pos.z).toBeCloseTo(0, 1);
+    expect(ball.pos.z).toBeCloseTo(SimulationConfig.BALL_RADIUS, 2);
     expect(Math.abs(ball.vel.z)).toBeLessThanOrEqual(SimulationConfig.BALL_BOUNCE_DEAD_ZONE);
   });
 
