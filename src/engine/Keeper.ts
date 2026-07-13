@@ -9,6 +9,9 @@ export class Keeper {
   facing = new Vec2(0, -1);
   aiState: KeeperState = 'positioning';
 
+  /** True on the tick the keeper deflects or punches the ball (for save tracking). */
+  savedThisTick = false;
+
   private diveTimer = 0;
   private diveVelocity = new Vec2(0, 0);
   private readonly scratchToBall = new Vec2();
@@ -21,9 +24,11 @@ export class Keeper {
     this.diveTimer = 0;
     this.diveVelocity.set(0, 0);
     this.facing.set(0, -1);
+    this.savedThisTick = false;
   }
 
   update(dt: number, ball: Ball, rushHeld = false, denyPassbackCollection = false) {
+    this.savedThisTick = false;
     if (this.aiState === 'positioning') this.updatePositioning(dt, ball, rushHeld, denyPassbackCollection);
     else if (this.aiState === 'diving') this.updateDiving(dt, ball);
     else this.updateRecovering(dt);
@@ -227,11 +232,13 @@ export class Keeper {
     ball.vel.y = -Math.abs(ball.vel.y) * 0.4;
     ball.vel.x *= -0.3;
     ball.vel.z *= 0.5;
+    this.savedThisTick = true;
   }
 
   private punchClear(ball: Ball) {
     ball.vel.y = -Math.abs(ball.vel.y) * 0.6 - 2;
     ball.vel.x *= 0.5;
     ball.vel.z = Math.abs(ball.vel.z) * 0.3 + 3;
+    this.savedThisTick = true;
   }
 }

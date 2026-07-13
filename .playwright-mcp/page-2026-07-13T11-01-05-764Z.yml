@@ -1,0 +1,88 @@
+- generic [ref=f3e139]:
+  - generic [ref=f3e140]:
+    - generic "Football simulation viewport" [ref=f3e141]
+    - generic: WebGPURenderer
+  - button [ref=f3e143] [cursor=pointer]
+  - button [ref=f3e149] [cursor=pointer]
+  - generic:
+    - generic:
+      - paragraph: Controls
+      - list:
+        - listitem:
+          - generic: Move
+          - generic:
+            - generic: W
+            - generic: A
+            - generic: S
+            - generic: D
+        - listitem:
+          - generic: Sprint
+          - generic: Shift
+        - listitem:
+          - generic: Shield
+          - generic: Ctrl
+        - listitem:
+          - generic: Pass
+          - generic:
+            - generic: F
+            - generic: Space
+        - listitem:
+          - generic: Shoot
+          - generic:
+            - generic: G
+            - generic: Enter
+        - listitem:
+          - generic: Through
+          - generic: R
+        - listitem:
+          - generic: Lob
+          - generic: E
+        - listitem:
+          - generic: Finesse
+          - generic: Q
+        - listitem:
+          - generic: Chip
+          - generic: Alt
+        - listitem:
+          - generic: Skill
+          - generic: C
+        - listitem:
+          - generic: Tackle
+          - generic: T
+        - listitem:
+          - generic: Slide
+          - generic:
+            - generic: X
+            - generic: Shift+T
+      - paragraph: Hold to charge. Tap shoot twice for low driven.
+  - generic:
+    - generic:
+      - generic:
+        - generic: "0"
+        - generic: "|"
+        - generic:
+          - generic: 0:12
+          - generic: 1ST HALF
+        - generic: "|"
+        - generic: "0"
+  - generic:
+    - generic:
+      - paragraph: Diagnostics
+      - generic:
+        - generic: FPS
+        - generic: "118"
+        - generic: TPS
+        - generic: "149"
+        - generic: Player
+        - generic: 0.0 m/s
+        - generic: Ball
+        - generic: 0.0 m/s
+        - generic: Offside
+        - generic: 52.0m
+      - generic: free
+      - generic: GK — positioning
+  - generic [ref=f3e155]:
+    - 'button "Sim: TypeScript" [ref=f3e156]'
+    - button "Settings" [ref=f3e166]
+    - button "Sound On" [ref=f3e171]
+    - button "Offside Line" [ref=f3e177]

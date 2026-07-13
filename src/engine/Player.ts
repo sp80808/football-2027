@@ -30,6 +30,16 @@ export class Player {
   activeShotModifier: ShotModifier = 'none';
   skillBurstTimer = 0;
   private touchTimer = 0;
+
+  /**
+   * RPG attribute bindings — derived from the controlled footballer's profile
+   * (see career/attributeBindings). Neutral by default; the gameplay loop sets
+   * these when a squad profile is bound so PAC/SHO/PAS/DRI/PHY affect physics.
+   */
+  speedMul = 1;
+  accelMul = 1;
+  controlMul = 1;
+  kickPowerMul = 1;
   
   // Enhanced locomotion properties
   private angularVelocity = 0; // radians per second
@@ -195,7 +205,7 @@ export class Player {
 
   private updateLocomotion(dt: number, intent: ReturnType<typeof parseIntent>) {
     const cfg = SimulationConfig;
-    const targetSpeed = intent.isContaining ? cfg.PLAYER_MAX_SPEED*cfg.CONTAIN_SPEED_MULT : intent.urgency>=1 ? cfg.PLAYER_SPRINT_SPEED : cfg.PLAYER_MAX_SPEED;
+    const targetSpeed = (intent.isContaining ? cfg.PLAYER_MAX_SPEED*cfg.CONTAIN_SPEED_MULT : intent.urgency>=1 ? cfg.PLAYER_SPRINT_SPEED : cfg.PLAYER_MAX_SPEED) * this.speedMul;
     const moveDirection = intent.moveDir.clone();
 
     if (moveDirection.magSq() < 0.01) {
@@ -205,7 +215,7 @@ export class Player {
         this.vel.normalize().mul(speed - drop);
       }
     } else {
-      this.vel.add(moveDirection.normalize().mul(cfg.PLAYER_ACCEL * dt));
+      this.vel.add(moveDirection.normalize().mul(cfg.PLAYER_ACCEL * this.accelMul * dt));
       if (this.vel.magSq() > targetSpeed * targetSpeed) this.vel.normalize().mul(targetSpeed);
 
       const speedRatio = Math.min(this.vel.mag() / cfg.PLAYER_SPRINT_SPEED, 1);
@@ -230,7 +240,7 @@ export class Player {
   ) {
     const cfg = SimulationConfig;
     const distanceToBall = this.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y));
-    const controlRadius = cfg.PLAYER_CONTROL_RADIUS;
+    const controlRadius = cfg.PLAYER_CONTROL_RADIUS * this.controlMul;
 
     if (intent.isShielding && distanceToBall < controlRadius) {
       this.controlState = 'shielding';
@@ -347,7 +357,7 @@ export class Player {
 
     if (action === 'shot' || action === 'first_time') {
       const powerScale = action === 'first_time' ? 0.75 : 1;
-      const power = cfg.SHOT_POWER_BASE * multiplier * powerScale;
+      const power = cfg.SHOT_POWER_BASE * multiplier * powerScale * this.kickPowerMul;
       let lift = (action === 'first_time' ? 1.6 : 3) * multiplier;
       let spin: Vec3 | undefined;
 
@@ -371,7 +381,7 @@ export class Player {
       return;
     }
 
-    const passPower = cfg.PASS_POWER_BASE * multiplier;
+    const passPower = cfg.PASS_POWER_BASE * multiplier * this.kickPowerMul;
     let lift = 0.5 * multiplier;
     let leadScale = 1;
     let powerScale = 1;

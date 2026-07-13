@@ -14,6 +14,8 @@ import { useGameStore } from '../store/gameStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { commentaryService } from '../audio/CommentaryService';
 import { useCareerStore } from '../career/careerStore';
+import { useSquadStore } from '../career/squadStore';
+import { bindingsForProfile } from '../career/attributeBindings';
 import { displayMatchMinute } from '../utils/matchTime';
 
 const RenderingPanel = React.lazy(() =>
@@ -27,7 +29,7 @@ wasmClient.init();
 
 interface GameplayScreenProps {
   mode?: 'quickMatch' | 'career';
-  onExit: () => void;
+  onExit: (result?: { homeScore: number; awayScore: number }) => void;
 }
 
 export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMatch', onExit }) => {
@@ -68,6 +70,21 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
     };
   }, []);
 
+  // Bind the controlled player's RPG attributes into the engine physics.
+  useEffect(() => {
+    const apply = () => {
+      const controlled = useSquadStore.getState().getControlled();
+      if (!controlled) return;
+      const b = bindingsForProfile(controlled);
+      tsEngine.player.speedMul = b.speedMul;
+      tsEngine.player.accelMul = b.accelMul;
+      tsEngine.player.controlMul = b.controlMul;
+      tsEngine.player.kickPowerMul = b.kickPowerMul;
+    };
+    apply();
+    return useSquadStore.subscribe(apply);
+  }, []);
+
   useEffect(() => {
     if (phase === 'full_time') maybeRecordCareerResult();
   }, [phase, mode]);
@@ -103,7 +120,20 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
         tsEngine.update(time);
         const snapshot = tsEngine.getMatchSnapshot();
         useGameStore.getState().syncMatch(snapshot);
+
+        // RPG: feed the on-pitch action tracker (only in career mode where a squad exists).
+        if (mode === 'career') {
+          const tracker = useSquadStore.getState().tracker;
+          const playerHasBall = tsEngine.player.controlState === 'under_control' || tsEngine.player.controlState === 'shielding';
+          tracker.observeTick(snapshot.matchTime, playerHasBall);
+          // Player-switch (Tab / LB) cycles which squad member is controlled.
+          if (tsEngine.input.currentFrame.switchPressed) {
+            useSquadStore.getState().switchControl();
+          }
+        }
+
         const frameEvents = tsEngine.drainEvents();
+        if (mode === 'career') useSquadStore.getState().tracker.ingestSimEvents(frameEvents);
         commentaryService.update(frameEvents, snapshot, tsEngine.player);
         for (const event of frameEvents) {
           const state = tsEngine.getRenderState();

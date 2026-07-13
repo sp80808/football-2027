@@ -22,7 +22,12 @@ export type SimEvent =
   | { type: 'shot'; side: 'player' | 'opponent' }
   | { type: 'offside'; side: 'player' | 'opponent' }
   | { type: 'tackle'; side: 'player' | 'opponent' }
-  | { type: 'whistle' };
+  | { type: 'whistle' }
+  // RPG action events (side = 'player' attributes to the controlled footballer).
+  | { type: 'pass_completed'; side: 'player' | 'opponent' }
+  | { type: 'shot_on_target'; side: 'player' | 'opponent' }
+  | { type: 'shot_off_target'; side: 'player' | 'opponent' }
+  | { type: 'save'; side: 'player' | 'opponent' };
 
 export class GameEngine {
   input = new InputSystem();
@@ -303,14 +308,46 @@ export class GameEngine {
       if (power > 0.45) {
         if (this.opponent.aiState === 'shooting') {
           this.pendingEvents.push({ type: 'shot', side: 'opponent' });
+          if (this.isShotOnTarget('opponent')) this.pendingEvents.push({ type: 'shot_on_target', side: 'opponent' });
+          else this.pendingEvents.push({ type: 'shot_off_target', side: 'opponent' });
         } else if (playerShooting) {
           this.pendingEvents.push({ type: 'shot', side: 'player' });
+          if (this.isShotOnTarget('player')) this.pendingEvents.push({ type: 'shot_on_target', side: 'player' });
+          else this.pendingEvents.push({ type: 'shot_off_target', side: 'player' });
+        } else if (passReleased) {
+          // A meaningful pass kick by the player.
+          this.pendingEvents.push({ type: 'pass_completed', side: 'player' });
         }
+      } else if (passReleased) {
+        // Soft pass / lay-off.
+        this.pendingEvents.push({ type: 'pass_completed', side: 'player' });
       }
+    }
+
+    // Keeper save: the player's keeper deflected/punched an opponent shot.
+    if (this.keeper.savedThisTick) {
+      this.pendingEvents.push({ type: 'save', side: 'player' });
     }
 
     this.previousControlState = this.player.controlState;
     this.enforceBoundaries();
+  }
+
+  /**
+   * Project the ball's current velocity to the relevant goal line and check
+   * whether it would cross inside the posts and under the crossbar.
+   * Player attacks +Y (keeper end); opponent attacks -Y (player end).
+   */
+  private isShotOnTarget(side: 'player' | 'opponent'): boolean {
+    const cfg = SimulationConfig;
+    const goalY = side === 'player' ? cfg.PITCH_HALF_LENGTH : -cfg.PITCH_HALF_LENGTH;
+    const vy = this.ball.vel.y;
+    if (side === 'player' ? vy <= 0.5 : vy >= -0.5) return false; // not heading at goal
+    const t = (goalY - this.ball.pos.y) / vy; // seconds to goal line
+    if (!isFinite(t) || t <= 0 || t > 2) return false;
+    const xAtGoal = this.ball.pos.x + this.ball.vel.x * t;
+    const zAtGoal = this.ball.pos.z + this.ball.vel.z * t - 0.5 * cfg.BALL_GRAVITY * t * t;
+    return Math.abs(xAtGoal) <= cfg.GOAL_HALF_WIDTH && zAtGoal <= cfg.GOAL_HEIGHT && zAtGoal >= 0;
   }
 
   private updateOffsideLine() {

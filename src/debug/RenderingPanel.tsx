@@ -691,7 +691,7 @@ export function RenderingPanel({
       statsPanel?.dom.remove();
       window.removeEventListener('resize', resize);
       ballTrail?.dispose();
-      crowd.dispose();
+      crowd?.dispose();
       renderer?.dispose?.();
     };
   }, [useWasm, engine, wasmClient]);
