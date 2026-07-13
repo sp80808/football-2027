@@ -1,0 +1,1 @@
+export const FC26_PARITY_CHECKLIST=[{feature:'contain',status:'implemented'},{feature:'fake shot',status:'implemented'},{feature:'through lead',status:'implemented'},{feature:'gk passback',status:'implemented'}] as const;

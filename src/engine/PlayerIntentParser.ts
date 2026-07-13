@@ -76,8 +76,10 @@ export function parseIntent(frame: ControllerFrame, ctx: ParseContext): PlayerIn
 
   const urgency = frame.sprint > 0.5 ? 1.0 : hasMoveInput ? 0.6 : 0.0;
 
+  const isContaining = frame.shield > 0.5 && !ctx.ballInControl;
+  const isShielding = frame.shield > 0.5 && ctx.ballInControl;
   let desiredTouch: TouchAction = 'push';
-  if (frame.shield > 0.5) {
+  if (isShielding) {
     desiredTouch = 'shield';
   } else if (urgency >= 1.0 && ctx.playerSpeed > cfg.PLAYER_SPRINT_SPEED * 0.7) {
     desiredTouch = 'knock_on';
@@ -91,11 +93,12 @@ export function parseIntent(frame: ControllerFrame, ctx: ParseContext): PlayerIn
 
   let skillMove: SkillMove = 'none';
   if (frame.skillPressed && ctx.ballInControl) {
-    if (hasMoveInput) skillMove = 'step_over';
+    const backing = hasMoveInput && moveDir.dot(faceDir) < -0.35;
+    if (backing) skillMove = 'drag_back';
+    else if (hasMoveInput) skillMove = 'step_over';
     else skillMove = 'ball_roll';
-  } else if (desiredTouch === 'knock_on' && hasMoveInput) {
-    skillMove = 'knock_on';
-  }
+  } else if (desiredTouch === 'knock_on' && hasMoveInput) skillMove = 'knock_on';
+  else if (ctx.chargeType==='shoot'&&frame.shootReleased&&ctx.isCharging&&ctx.chargeDuration<cfg.FAKE_SHOT_MAX_CHARGE&&ctx.ballInControl) skillMove='fake_shot';
 
   let action: BallAction = 'none';
   if (ctx.ballReceiving && frame.shootReleased && ctx.isCharging && ctx.chargeType === 'shoot') {
@@ -128,7 +131,8 @@ export function parseIntent(frame: ControllerFrame, ctx: ParseContext): PlayerIn
     shotModifier,
     skillMove,
     charge,
-    isShielding: frame.shield > 0.5,
+    isShielding,
+    isContaining,
     cancelRequested: false,
   };
 }

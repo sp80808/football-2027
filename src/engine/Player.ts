@@ -100,9 +100,9 @@ export class Player {
 
     if (this.skillBurstTimer > 0) this.skillBurstTimer -= dt;
     this.applySkillMove(dt, intent.skillMove, ball);
-
+    if (intent.isContaining && opponent) { this.scratchToPlayer.set(opponent.pos.x-this.pos.x,opponent.pos.y-this.pos.y); if (this.scratchToPlayer.magSq()>0.01) intent.faceDir.copy(this.scratchToPlayer.normalize()); }
     this.updateLocomotion(dt, intent);
-    this.updateBallInteraction(dt, input, intent, ball);
+    this.updateBallInteraction(dt, input, intent, ball, opponent);
   }
 
   private detectBallReceiving(ball: Ball): boolean {
@@ -182,11 +182,9 @@ export class Player {
       const perp = new Vec2(-this.facing.y, this.facing.x);
       this.vel.add(perp.mul(cfg.PLAYER_ACCEL * 2.5 * dt));
       this.skillBurstTimer = 0.18;
-    } else if (skill === 'ball_roll') {
-      const perp = new Vec2(-this.facing.y, this.facing.x);
-      ball.vel.x += perp.x * 4;
-      ball.vel.y += perp.y * 4;
-      this.skillBurstTimer = 0.22;
+    } else if (skill === 'ball_roll') { const perp=new Vec2(-this.facing.y,this.facing.x); ball.vel.x+=perp.x*4; ball.vel.y+=perp.y*4; this.skillBurstTimer=0.22;
+    } else if (skill==='drag_back'){ball.vel.x-=this.facing.x*3.5;ball.vel.y-=this.facing.y*3.5;this.vel.x-=this.facing.x*cfg.PLAYER_ACCEL*1.8*dt;this.vel.y-=this.facing.y*cfg.PLAYER_ACCEL*1.8*dt;this.skillBurstTimer=0.25;
+    } else if (skill==='fake_shot'){this.vel.x+=this.facing.x*cfg.PLAYER_SPRINT_SPEED*cfg.FAKE_SHOT_BURST_MULT*0.12;this.vel.y+=this.facing.y*cfg.PLAYER_SPRINT_SPEED*cfg.FAKE_SHOT_BURST_MULT*0.12;this.skillBurstTimer=0.14;
     } else if (skill === 'knock_on') {
       const burst = this.facing.clone().mul(cfg.PLAYER_SPRINT_SPEED * 0.35);
       ball.vel.x += burst.x;
@@ -197,7 +195,7 @@ export class Player {
 
   private updateLocomotion(dt: number, intent: ReturnType<typeof parseIntent>) {
     const cfg = SimulationConfig;
-    const targetSpeed = intent.urgency >= 1 ? cfg.PLAYER_SPRINT_SPEED : cfg.PLAYER_MAX_SPEED;
+    const targetSpeed = intent.isContaining ? cfg.PLAYER_MAX_SPEED*cfg.CONTAIN_SPEED_MULT : intent.urgency>=1 ? cfg.PLAYER_SPRINT_SPEED : cfg.PLAYER_MAX_SPEED;
     const moveDirection = intent.moveDir.clone();
 
     if (moveDirection.magSq() < 0.01) {
@@ -213,7 +211,7 @@ export class Player {
       const speedRatio = Math.min(this.vel.mag() / cfg.PLAYER_SPRINT_SPEED, 1);
       const turnSpeed = cfg.PLAYER_TURN_SPEED_WALK
         + (cfg.PLAYER_TURN_SPEED_SPRINT - cfg.PLAYER_TURN_SPEED_WALK) * speedRatio;
-      const effectiveTurnSpeed = intent.isShielding ? turnSpeed * 0.5 : turnSpeed;
+      const effectiveTurnSpeed = intent.isShielding ? turnSpeed*0.5 : intent.isContaining ? turnSpeed*cfg.CONTAIN_TURN_MULT : turnSpeed;
       const targetFacing = intent.faceDir.clone();
       this.facing.x += (targetFacing.x - this.facing.x) * effectiveTurnSpeed * dt;
       this.facing.y += (targetFacing.y - this.facing.y) * effectiveTurnSpeed * dt;
@@ -228,6 +226,7 @@ export class Player {
     input: ControllerFrame,
     intent: ReturnType<typeof parseIntent>,
     ball: Ball,
+    opponent?: Opponent,
   ) {
     const cfg = SimulationConfig;
     const distanceToBall = this.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y));
@@ -249,22 +248,24 @@ export class Player {
     this.activeShotModifier = intent.shotModifier;
 
     const kickAction = this.resolveKickAction(input, intent);
-    this.updateCharging(dt, input, kickAction);
+    const isFakeShot=intent.skillMove==='fake_shot';
+    this.updateCharging(dt,input,isFakeShot?null:kickAction);
 
     const canFirstTime =
       kickAction === 'first_time' &&
       (this.controlState === 'receiving' || this.controlState === 'loose_nearby');
 
-    if (canFirstTime && this.isCharging) {
-      this.executeKick(ball, kickAction, intent);
+    if (isFakeShot&&this.isCharging){this.applySkillMove(dt,'fake_shot',ball);this.isCharging=false;this.chargeStart=0;this.activeShotModifier='none';}
+    else if (canFirstTime && this.isCharging) {
+      this.executeKick(ball, kickAction, intent, opponent);
       this.isCharging = false;
       this.chargeStart = 0;
       this.activePassModifier = 'none';
       this.activeShotModifier = 'none';
       this.controlState = 'free';
-    } else if (kickAction && this.isCharging) {
+    } else if (kickAction && this.isCharging && !isFakeShot) {
       if (this.controlState === 'under_control' || this.controlState === 'loose_nearby') {
-        this.executeKick(ball, kickAction, intent);
+        this.executeKick(ball, kickAction, intent, opponent);
       }
       this.isCharging = false;
       this.chargeStart = 0;
@@ -339,7 +340,7 @@ export class Player {
     }
   }
 
-  private executeKick(ball: Ball, action: BallAction, intent: ReturnType<typeof parseIntent>) {
+  private executeKick(ball: Ball, action: BallAction, intent: ReturnType<typeof parseIntent>, opponent?: Opponent) {
     const cfg = SimulationConfig;
     const multiplier = Math.max(cfg.MIN_CHARGE_FRACTION, this.chargeStart / cfg.MAX_CHARGE_TIME);
     const direction = this.facing.clone();
@@ -375,12 +376,10 @@ export class Player {
     let leadScale = 1;
     let powerScale = 1;
 
-    if (action === 'through_pass') {
-      lift = 1.2 * multiplier;
-      leadScale = 1.35;
-      direction.add(this.vel.clone().mul(0.08 * multiplier));
-      direction.normalize();
-    } else if (action === 'lob_pass') {
+    if (action === 'through_pass') { lift=1.2*multiplier; leadScale=1.35;
+      if (opponent) { const la=cfg.THROUGH_LEAD_BASE+multiplier*cfg.THROUGH_LEAD_CHARGE_SCALE; const tgY=cfg.PITCH_HALF_LENGTH-opponent.pos.y,tgX=-opponent.pos.x,tl=Math.hypot(tgX,tgY);
+        if (tl>0.01){direction.set(opponent.pos.x+(tgX/tl)*la-this.pos.x,opponent.pos.y+(tgY/tl)*la-this.pos.y); if(direction.magSq()>0.01)direction.normalize();}}
+      else {direction.add(this.vel.clone().mul(0.08*multiplier));direction.normalize();} powerScale=1.05; } else if (action === 'lob_pass') {
       lift = 5.5 * multiplier;
       powerScale = 0.9;
     } else if (action === 'driven_pass') {

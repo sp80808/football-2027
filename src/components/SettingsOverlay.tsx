@@ -91,6 +91,7 @@ export function SettingsOverlay() {
               if (on !== audioEnabled) toggleAudio();
             }}
           />
+          <Toggle label="Commentary" checked={commentaryEnabled} onChange={setCommentaryEnabled} />
         </section>
 
         <section>

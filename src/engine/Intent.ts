@@ -58,7 +58,7 @@ export interface ControllerFrame {
 export type TouchAction = 'cushion' | 'push' | 'shield' | 'knock_on';
 export type PassModifier = 'none' | 'through' | 'lob' | 'driven' | 'lob_through';
 export type ShotModifier = 'none' | 'finesse' | 'chip' | 'low_driven' | 'power';
-export type SkillMove = 'none' | 'knock_on' | 'step_over' | 'ball_roll';
+export type SkillMove = 'none' | 'knock_on' | 'step_over' | 'ball_roll' | 'drag_back' | 'fake_shot';
 export type BallAction =
   | 'none'
   | 'short_pass'
@@ -80,5 +80,6 @@ export interface PlayerIntent {
   skillMove: SkillMove;
   charge: number;
   isShielding: boolean;
+  isContaining: boolean;
   cancelRequested: boolean;
 }

@@ -58,6 +58,7 @@ export class GameEngine {
   private readonly ballPlayPos = new Vec2();
   private readonly playerPosAtPlay = new Vec2();
   private awaitingOffsideCheck = false;
+  private passbackTimer = 0;
   private previousControlState = this.player.controlState;
   public offsideLineY: number | null = null;
 
@@ -123,6 +124,7 @@ export class GameEngine {
     this.lastGoalScorer = null;
     this.pendingEvents = [];
     this.awaitingOffsideCheck = false;
+    this.passbackTimer = 0;
     this.offsideLineY = null;
     this.captureState(this.previousState, 0);
     this.captureState(this.currentState, 0);
@@ -268,7 +270,9 @@ export class GameEngine {
       this.ballPlayPos.set(this.ball.pos.x, this.ball.pos.y);
       this.playerPosAtPlay.copy(this.player.pos);
       this.awaitingOffsideCheck = true;
+      this.passbackTimer = SimulationConfig.KEEPER_PASSBACK_WINDOW;
     }
+    if (this.passbackTimer > 0) this.passbackTimer -= this.dt;
 
     const velBefore = this.ball.vel.mag();
     const zVelBefore = this.ball.vel.z;
@@ -278,7 +282,8 @@ export class GameEngine {
       this.player.chargeType === 'shoot';
 
     this.player.update(this.dt, this.input.currentFrame, this.ball, this.opponent);
-    this.keeper.update(this.dt, this.ball, this.input.currentFrame.keeperRushHeld);
+    const denyPassback = this.passbackTimer > 0 && this.ball.pos.y > SimulationConfig.PITCH_HALF_LENGTH - SimulationConfig.KEEPER_BOX_DEPTH;
+    this.keeper.update(this.dt, this.ball, this.input.currentFrame.keeperRushHeld, denyPassback);
     this.opponent.update(this.dt, this.ball, this.player);
     if (this.player.tackleWonThisTick) {
       this.pendingEvents.push({ type: 'tackle', side: 'player' });
@@ -341,6 +346,7 @@ export class GameEngine {
     );
 
     this.awaitingOffsideCheck = false;
+    this.passbackTimer = 0;
 
     if (!result?.isOffside) return;
 
@@ -358,6 +364,7 @@ export class GameEngine {
     this.player.chargeStart = 0;
     this.player.resetDefensive();
     this.awaitingOffsideCheck = false;
+    this.passbackTimer = 0;
     this.previousControlState = 'free';
     this.opponent.reset();
   }
@@ -371,6 +378,7 @@ export class GameEngine {
     this.player.chargeStart = 0;
     this.player.resetDefensive();
     this.awaitingOffsideCheck = false;
+    this.passbackTimer = 0;
     this.previousControlState = 'free';
 
     this.ball.pos.set(0, 0, 0);

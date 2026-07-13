@@ -23,8 +23,8 @@ export class Keeper {
     this.facing.set(0, -1);
   }
 
-  update(dt: number, ball: Ball, rushHeld = false) {
-    if (this.aiState === 'positioning') this.updatePositioning(dt, ball, rushHeld);
+  update(dt: number, ball: Ball, rushHeld = false, denyPassbackCollection = false) {
+    if (this.aiState === 'positioning') this.updatePositioning(dt, ball, rushHeld, denyPassbackCollection);
     else if (this.aiState === 'diving') this.updateDiving(dt, ball);
     else this.updateRecovering(dt);
   }
@@ -55,7 +55,7 @@ export class Keeper {
     return t;
   }
 
-  private updatePositioning(dt: number, ball: Ball, rushHeld: boolean) {
+  private updatePositioning(dt: number, ball: Ball, rushHeld: boolean, denyPassbackCollection: boolean) {
     const cfg = SimulationConfig;
     const goalLineY = cfg.PITCH_HALF_LENGTH - 0.5;
     const boxEdgeY = goalLineY - cfg.KEEPER_BOX_DEPTH;
@@ -104,7 +104,7 @@ export class Keeper {
     }
 
     if (distanceToBall < cfg.KEEPER_SAVE_RADIUS && ball.pos.z < cfg.GOAL_HEIGHT) {
-      this.deflect(ball);
+      if (denyPassbackCollection && ballSpeed < cfg.KEEPER_LOOSE_BALL_MAX_SPEED * 1.5) this.punchClear(ball); else this.deflect(ball);
     }
 
     if (
