@@ -27,8 +27,13 @@ import { modifierLabel } from '../engine/PlayerIntentParser';
 import type { PassModifier, ShotModifier } from '../engine/Intent';
 import { formatBroadcastClock, getPeriodLabel } from '../utils/matchTime';
 import { ControlBindingsPanel } from './ControlGlyph';
-import { ControlBindingsPanel } from './ControlGlyph';
-import { ControlBindingsPanel } from './ControlGlyph';
+import {
+  motionTransition,
+  slideFromSide,
+  springBouncy,
+  springSmooth,
+  useReducedMotion,
+} from '../ui/motionPresets';
 
 interface HUDProps {
   engine: GameEngine;
@@ -67,7 +72,16 @@ function StatRow({ label, value, accent = 'text-white' }: { label: string; value
   );
 }
 
-function PlayEventChip({ event, align }: { event: PlayEvent; align: 'left' | 'right' }) {
+function ScoreDigit({ value, accent }: { value: number; accent: string }) {
+  const reduced = useReducedMotion();
+  return (
+    <motion.span key={value} initial={reduced ? false : { scale: 1.4, filter: 'brightness(1.8)' }} animate={{ scale: 1, filter: 'brightness(1)' }} transition={motionTransition(reduced, springBouncy)} className={`min-w-[1.25rem] text-center font-mono text-2xl font-black tabular-nums leading-none ${accent}`}>{value}</motion.span>
+  );
+}
+
+function PlayEventChip({ event, align, index }: { event: PlayEvent; align: 'left' | 'right'; index: number }) {
+  const reduced = useReducedMotion();
+  const slide = slideFromSide(align, index);
   const isHome = event.side === 'home';
   const accent = event.kind === 'offside'
     ? 'border-amber-500/35 bg-amber-500/15 text-amber-200'
@@ -77,8 +91,23 @@ function PlayEventChip({ event, align }: { event: PlayEvent; align: 'left' | 'ri
 
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, x: align === 'left' ? -24 : 24, y: 8 }}
+      layout={!reduced}
+      initial={reduced ? false : slide.initial}
+      animate={slide.animate}
+      exit={reduced ? undefined : slide.exit}
+      transition={motionTransition(reduced, slide.transition)}
+      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 backdrop-blur-sm ${accent} ${align === 'right' ? 'flex-row-reverse' : ''}`}
+    >
+      <span className="flex items-center gap-1 font-mono text-[10px] tabular-nums text-white/55">
+        <Clock size={10} className="shrink-0 opacity-70" />
+        {`${event.matchMinute}'`}
+      </span>
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-white/95">{event.label}</span>
+    </motion.div>
+  );
+}
+
+REMOVE_OLD_CHIP align === 'left' ? -24 : 24, y: 8 }}
       animate={{ opacity: 1, x: 0, y: 0 }}
       exit={{ opacity: 0, x: align === 'left' ? -16 : 16 }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
@@ -99,8 +128,8 @@ function PlayEventFeed({ side, align }: { side: 'home' | 'away'; align: 'left' |
   return (
     <div className={`pointer-events-none absolute bottom-4 z-10 flex max-w-[min(220px,42vw)] flex-col gap-1.5 select-none ${align === 'left' ? 'left-3 sm:left-4' : 'right-3 sm:right-4 items-end'}`}>
       <AnimatePresence mode="popLayout">
-        {events.map((event) => (
-          <PlayEventChip key={event.id} event={event} align={align} />
+        {events.map((event, index) => (
+          <PlayEventChip key={event.id} event={event} align={align} index={index} />
         ))}
       </AnimatePresence>
     </div>
@@ -108,6 +137,7 @@ function PlayEventFeed({ side, align }: { side: 'home' | 'away'; align: 'left' |
 }
 
 export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = false, onToggleOffsideLine }: HUDProps) {
+  const reduced = useReducedMotion();
   const { audioEnabled, toggleAudio, homeScore, awayScore, elapsedSeconds, phase, announcement, half } = useGameStore();
   const { showControlHints, setSettingsOpen, activeModifierLabel, flashModifierLabel } = useSettingsStore();
   const [diagnostics, setDiagnostics] = useState({
@@ -236,9 +266,7 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
       <div className="pointer-events-none absolute left-3 top-3 z-20 select-none sm:left-4 sm:top-4">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3 rounded-xl border border-white/15 bg-black/70 px-3 py-2 shadow-lg backdrop-blur-md sm:gap-4 sm:px-4">
-            <span className="min-w-[1.25rem] text-center font-mono text-2xl font-black tabular-nums leading-none text-emerald-300">
-              {homeScore}
-            </span>
+            <ScoreDigit value={homeScore} accent="text-emerald-300" />
             <span className="text-white/25">|</span>
             <div className="flex min-w-[3.5rem] flex-col items-center">
               <span className="font-mono text-sm font-bold tabular-nums tracking-tight text-white">
@@ -249,9 +277,7 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
               </span>
             </div>
             <span className="text-white/25">|</span>
-            <span className="min-w-[1.25rem] text-center font-mono text-2xl font-black tabular-nums leading-none text-red-300">
-              {awayScore}
-            </span>
+            <ScoreDigit value={awayScore} accent="text-red-300" />
           </div>
           {announcement && (
             <span className="w-fit rounded-full border border-amber-500/30 bg-amber-500/20 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-amber-300">
@@ -268,7 +294,7 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
 
       {diagnostics.charging && (
         <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 select-none">
-          <div className={`min-w-[180px] rounded-lg border px-4 py-2 backdrop-blur-sm ${diagnostics.chargeType === 'shoot' && diagnostics.shotModifier === 'power' ? 'border-red-400/40 bg-black/80 shadow-[0_0_24px_rgba(239,68,68,0.25)]' : 'border-white/10 bg-black/70'}`}>
+          <motion.div animate={!reduced && diagnostics.chargePercent >= 100 ? { x: [0, -2, 2, -1, 1, 0] } : { x: 0 }} transition={{ duration: 0.35, ease: "easeOut" }} className={`min-w-[180px] rounded-lg border px-4 py-2 backdrop-blur-sm ${diagnostics.chargeType === 'shoot' && diagnostics.shotModifier === 'power' ? 'border-red-400/40 bg-black/80 shadow-[0_0_24px_rgba(239,68,68,0.25)]' : 'border-white/10 bg-black/70'}`}>
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-[11px] font-medium capitalize text-white/60">
                 {diagnostics.chargeType === 'shoot' ? 'Shooting' : 'Passing'}
@@ -278,22 +304,24 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
               </span>
             </div>
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
-              <div
+              <motion.div
                 className={`h-full rounded-full ${chargeBarClass()}`}
-                style={{ width: `${diagnostics.chargePercent}%` }}
+                animate={{ width: `${diagnostics.chargePercent}%`, boxShadow: diagnostics.chargePercent > 20 ? `0 0 ${8 + diagnostics.chargePercent * 0.2}px rgba(96, 165, 250, ${0.15 + diagnostics.chargePercent * 0.004})` : "none" }} transition={motionTransition(reduced, springSmooth)}
               />
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
-      {activeModifierLabel && (
-        <div className="pointer-events-none absolute left-1/2 top-24 -translate-x-1/2 select-none">
+      <AnimatePresence>
+        {activeModifierLabel && (
+          <motion.div key={activeModifierLabel} initial={reduced ? false : { opacity: 0, y: 16, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={reduced ? undefined : { opacity: 0, y: -8, scale: 0.96 }} transition={motionTransition(reduced, springBouncy)} className="pointer-events-none absolute left-1/2 top-24 -translate-x-1/2 select-none">
           <span className="rounded-full border border-white/20 bg-black/70 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-white/90 backdrop-blur-sm">
             {activeModifierLabel}
           </span>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="pointer-events-none absolute right-3 top-3 select-none sm:right-4 sm:top-4">
         <div className="min-w-[190px] rounded-xl border border-white/10 bg-black/60 p-3 backdrop-blur-sm">
