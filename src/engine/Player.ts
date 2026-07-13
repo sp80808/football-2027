@@ -11,7 +11,9 @@ export type BallControlState =
   | 'stretching'
   | 'shielding'
   | 'receiving'
-  | 'shooting_preparation';
+  | 'shooting_preparation'
+  | 'jumping'
+  | 'heading';
 
 export class Player {
   pos = new Vec2(0, 0);
@@ -25,6 +27,38 @@ export class Player {
   activeShotModifier: ShotModifier = 'none';
   skillBurstTimer = 0;
   private touchTimer = 0;
+  
+  // Enhanced locomotion properties
+  private angularVelocity = 0; // radians per second
+  private angularDrag = 0.1;
+  private facingTarget = new Vec2(1, 0);
+  private speedBuffer = 0; // for acceleration/deceleration smoothing
+  
+  // Stamina/fatigue system
+  stamina = 100; // 0-100%
+  maxStamina = 100;
+  staminaDrainRate = 0.1; // per second at max effort
+  staminaRegenRate = 0.05; // per second when resting
+  
+  // Physical attributes for enhanced interactions
+  strength = 10; // 1-20 scale
+  aggression = 10; // 1-20 scale
+  jumping = 10; // 1-20 scale
+  heading = 10; // 1-20 scale
+  
+  // First touch and ball control
+  firstTouchQuality = 0; // 0-1, based on attributes and situation
+  private trapTimer = 0;
+  
+  // Collision
+  private isColliding = false;
+  private collisionRecovery = 0;
+  
+  // Jumping/heading
+  jumpVelocity = 0;
+  isJumping = false;
+  jumpTimer = 0;
+}
 
   update(dt: number, input: ControllerFrame, ball: Ball) {
     const intent = parseIntent(input, {
