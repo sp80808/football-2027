@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { MatchPhase, MatchSnapshot } from '../engine/MatchManager';
 import { audioManager } from '../audio/AudioManager';
+import { commentaryService } from '../audio/CommentaryService';
+import { useSettingsStore } from './settingsStore';
 import { displayMatchMinute, getMatchHalf } from '../utils/matchTime';
 
 export type PlayEventKind = 'goal' | 'shot' | 'foul' | 'tackle' | 'kick' | 'offside';
@@ -120,6 +122,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set((s) => {
       const audioEnabled = !s.audioEnabled;
       audioManager.setEnabled(audioEnabled);
+      const { commentaryEnabled } = useSettingsStore.getState();
+      commentaryService.setEnabled(audioEnabled && commentaryEnabled);
       return { audioEnabled };
     }),
 }));

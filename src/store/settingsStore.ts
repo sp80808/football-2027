@@ -1,19 +1,29 @@
 import { create } from 'zustand';
+import type { CommentaryVoiceId } from '../audio/commentaryTtsConfig';
+import { DEFAULT_COMMENTARY_VOICE } from '../audio/commentaryTtsConfig';
+import { setMatchDurationSeconds } from '../engine/matchDuration';
 
 export type CameraMode = 'broadcast' | 'action' | 'steady' | 'dynamic';
 export type ZoomIntensity = 'low' | 'medium' | 'high';
+export type DevMatchDuration = 90 | 180;
 
 export interface SettingsState {
   cameraMode: CameraMode;
   cameraShake: boolean;
   zoomIntensity: ZoomIntensity;
   showControlHints: boolean;
+  commentaryEnabled: boolean;
+  commentaryVoice: CommentaryVoiceId;
+  devMatchDuration: DevMatchDuration;
   settingsOpen: boolean;
   activeModifierLabel: string | null;
   setCameraMode: (mode: CameraMode) => void;
   setCameraShake: (enabled: boolean) => void;
   setZoomIntensity: (level: ZoomIntensity) => void;
   setShowControlHints: (show: boolean) => void;
+  setCommentaryEnabled: (enabled: boolean) => void;
+  setCommentaryVoice: (voice: CommentaryVoiceId) => void;
+  setDevMatchDuration: (seconds: DevMatchDuration) => void;
   setSettingsOpen: (open: boolean) => void;
   setActiveModifierLabel: (label: string | null) => void;
   flashModifierLabel: (label: string) => void;
@@ -26,6 +36,9 @@ interface PersistedSettings {
   cameraShake: boolean;
   zoomIntensity: ZoomIntensity;
   showControlHints: boolean;
+  commentaryEnabled: boolean;
+  commentaryVoice: CommentaryVoiceId;
+  devMatchDuration: DevMatchDuration;
 }
 
 function loadPersisted(): Partial<PersistedSettings> {
@@ -50,29 +63,60 @@ function persist(state: PersistedSettings) {
 const saved = loadPersisted();
 let modifierTimeout: number | undefined;
 
+function snapshot(get: () => SettingsState): PersistedSettings {
+  return {
+    cameraMode: get().cameraMode,
+    cameraShake: get().cameraShake,
+    zoomIntensity: get().zoomIntensity,
+    showControlHints: get().showControlHints,
+    commentaryEnabled: get().commentaryEnabled,
+    commentaryVoice: get().commentaryVoice,
+    devMatchDuration: get().devMatchDuration,
+  };
+}
+
+const initialDevMatchDuration = saved.devMatchDuration ?? 90;
+setMatchDurationSeconds(initialDevMatchDuration);
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   cameraMode: saved.cameraMode ?? 'dynamic',
   cameraShake: saved.cameraShake ?? true,
   zoomIntensity: saved.zoomIntensity ?? 'medium',
   showControlHints: saved.showControlHints ?? true,
+  commentaryEnabled: saved.commentaryEnabled ?? true,
+  commentaryVoice: saved.commentaryVoice ?? DEFAULT_COMMENTARY_VOICE,
+  devMatchDuration: initialDevMatchDuration,
   settingsOpen: false,
   activeModifierLabel: null,
 
   setCameraMode: (cameraMode) => {
     set({ cameraMode });
-    persist({ cameraMode, cameraShake: get().cameraShake, zoomIntensity: get().zoomIntensity, showControlHints: get().showControlHints });
+    persist(snapshot(get));
   },
   setCameraShake: (cameraShake) => {
     set({ cameraShake });
-    persist({ cameraMode: get().cameraMode, cameraShake, zoomIntensity: get().zoomIntensity, showControlHints: get().showControlHints });
+    persist(snapshot(get));
   },
   setZoomIntensity: (zoomIntensity) => {
     set({ zoomIntensity });
-    persist({ cameraMode: get().cameraMode, cameraShake: get().cameraShake, zoomIntensity, showControlHints: get().showControlHints });
+    persist(snapshot(get));
   },
   setShowControlHints: (showControlHints) => {
     set({ showControlHints });
-    persist({ cameraMode: get().cameraMode, cameraShake: get().cameraShake, zoomIntensity: get().zoomIntensity, showControlHints });
+    persist(snapshot(get));
+  },
+  setCommentaryEnabled: (commentaryEnabled) => {
+    set({ commentaryEnabled });
+    persist(snapshot(get));
+  },
+  setCommentaryVoice: (commentaryVoice) => {
+    set({ commentaryVoice });
+    persist(snapshot(get));
+  },
+  setDevMatchDuration: (devMatchDuration) => {
+    setMatchDurationSeconds(devMatchDuration);
+    set({ devMatchDuration });
+    persist(snapshot(get));
   },
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setActiveModifierLabel: (activeModifierLabel) => set({ activeModifierLabel }),
@@ -83,4 +127,49 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       if (get().activeModifierLabel === label) set({ activeModifierLabel: null });
     }, 1800);
   },
+}));
+import { create } from 'zustand';
+
+export type CameraMode = 'broadcast' | 'action' | 'steady' | 'dynamic';
+export type ZoomIntensity = 'low' | 'medium' | 'high';
+
+export interface SettingsState {
+  cameraMode: CameraMode;
+  cameraShake: boolean;
+  zoomIntensity: ZoomIntensity;
+  showControlHints: boolean;
+  commentaryEnabled: boolean;
+  commentaryVolume: number;
+  settingsOpen: boolean;
+  activeModifierLabel: string | null;
+  setCameraMode: (mode: CameraMode) => void;
+  setCameraShake: (enabled: boolean) => void;
+  setZoomIntensity: (level: ZoomIntensity) => void;
+  setShowControlHints: (show: boolean) => void;
+  setCommentaryEnabled: (enabled: boolean) => void;
+  setCommentaryVolume: (volume: number) => void;
+  setSettingsOpen: (open: boolean) => void;
+  setActiveModifierLabel: (label: string | null) => void;
+  flashModifierLabel: (label: string) => void;
+}
+
+const STORAGE_KEY = 'football-2027-settings';
+interface PersistedSettings { cameraMode: CameraMode; cameraShake: boolean; zoomIntensity: ZoomIntensity; showControlHints: boolean; commentaryEnabled: boolean; commentaryVolume: number; }
+function loadPersisted(): Partial<PersistedSettings> { if (typeof window === 'undefined') return {}; try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) as PersistedSettings : {}; } catch { return {}; } }
+function persist(state: PersistedSettings) { if (typeof window === 'undefined') return; try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }
+const saved = loadPersisted(); let modifierTimeout: number | undefined;
+function snapshot(get: () => SettingsState): PersistedSettings { return { cameraMode: get().cameraMode, cameraShake: get().cameraShake, zoomIntensity: get().zoomIntensity, showControlHints: get().showControlHints, commentaryEnabled: get().commentaryEnabled, commentaryVolume: get().commentaryVolume }; }
+export const useSettingsStore = create<SettingsState>((set, get) => ({
+  cameraMode: saved.cameraMode ?? 'dynamic', cameraShake: saved.cameraShake ?? true, zoomIntensity: saved.zoomIntensity ?? 'medium', showControlHints: saved.showControlHints ?? true,
+  commentaryEnabled: saved.commentaryEnabled ?? true, commentaryVolume: saved.commentaryVolume ?? 1,
+  settingsOpen: false, activeModifierLabel: null,
+  setCameraMode: (cameraMode) => { set({ cameraMode }); persist(snapshot(get)); },
+  setCameraShake: (cameraShake) => { set({ cameraShake }); persist(snapshot(get)); },
+  setZoomIntensity: (zoomIntensity) => { set({ zoomIntensity }); persist(snapshot(get)); },
+  setShowControlHints: (showControlHints) => { set({ showControlHints }); persist(snapshot(get)); },
+  setCommentaryEnabled: (commentaryEnabled) => { set({ commentaryEnabled }); persist(snapshot(get)); },
+  setCommentaryVolume: (commentaryVolume) => { const clamped = Math.max(0, Math.min(1, commentaryVolume)); set({ commentaryVolume: clamped }); persist(snapshot(get)); },
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  setActiveModifierLabel: (activeModifierLabel) => set({ activeModifierLabel }),
+  flashModifierLabel: (label) => { set({ activeModifierLabel: label }); if (modifierTimeout) window.clearTimeout(modifierTimeout); modifierTimeout = window.setTimeout(() => { if (get().activeModifierLabel === label) set({ activeModifierLabel: null }); }, 1800); },
 }));

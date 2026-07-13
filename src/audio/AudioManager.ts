@@ -15,6 +15,8 @@ export class AudioManager {
   private whistle!: Howl;
   private bounce!: Howl;
   private crowd!: Howl;
+  private crowdBaseVolume = 0.15;
+  private commentaryDucking = false;
   private lastBounceTime = 0;
 
   init() {
@@ -27,9 +29,15 @@ export class AudioManager {
     this.bounce = new Howl({ src: [generateBounceSound()], volume: 0.25 });
     this.crowd = new Howl({
       src: [generateCrowdAmbience()],
-      volume: 0.15,
+      volume: this.crowdBaseVolume,
       loop: true,
     });
+  }
+
+  setCommentaryDucking(ducking: boolean) {
+    this.commentaryDucking = ducking;
+    if (!this.initialized) return;
+    this.crowd?.volume(ducking ? this.crowdBaseVolume * 0.35 : this.crowdBaseVolume);
   }
 
   setEnabled(enabled: boolean) {
@@ -59,8 +67,12 @@ export class AudioManager {
   playGoal() {
     if (!this.enabled || !this.initialized) return;
     this.goal.play();
-    this.crowd?.volume(0.35);
-    setTimeout(() => this.crowd?.volume(0.15), 3000);
+    if (!this.commentaryDucking) {
+      this.crowd?.volume(0.35);
+      setTimeout(() => {
+        if (!this.commentaryDucking) this.crowd?.volume(this.crowdBaseVolume);
+      }, 3000);
+    }
   }
 
   playWhistle() {

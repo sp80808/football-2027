@@ -11,6 +11,8 @@ import { SettingsOverlay } from '../components/SettingsOverlay';
 import { WorldState } from '../engine/WorldState';
 import { audioManager } from '../audio/AudioManager';
 import { useGameStore } from '../store/gameStore';
+import { useSettingsStore } from '../store/settingsStore';
+import { commentaryService } from '../audio/CommentaryService';
 import { displayMatchMinute } from '../utils/matchTime';
 
 const RenderingPanel = React.lazy(() =>
@@ -23,10 +25,11 @@ const wasmClient = new SimulationWorkerClient();
 wasmClient.init();
 
 interface GameplayScreenProps {
+  mode?: 'quickMatch' | 'career';
   onExit: () => void;
 }
 
-export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
+export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMatch', onExit }) => {
   const phase = useGameStore((s) => s.phase);
   const isMatchEnd = phase === 'full_time';
   const [useWasm, setUseWasm] = useState(false);
@@ -40,13 +43,26 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
 
   useEffect(() => {
     tsEngine.init();
+    commentaryService.reset();
+    const { commentaryEnabled, commentaryVolume } = useSettingsStore.getState();
+    commentaryService.setEnabled(useGameStore.getState().audioEnabled && commentaryEnabled);
+    commentaryService.setVolume(commentaryVolume);
     useGameStore.getState().resetMatchUi();
     useGameStore.getState().syncMatch(tsEngine.getMatchSnapshot());
 
     return () => {
       tsEngine.init();
+      commentaryService.reset();
       useGameStore.getState().resetMatchUi();
     };
+  }, []);
+
+  useEffect(() => {
+    return useSettingsStore.subscribe(() => {
+      const { commentaryEnabled, commentaryVolume } = useSettingsStore.getState();
+      commentaryService.setEnabled(useGameStore.getState().audioEnabled && commentaryEnabled);
+      commentaryService.setVolume(commentaryVolume);
+    });
   }, []);
 
   useEffect(() => {
@@ -69,8 +85,11 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
       requestId = requestAnimationFrame(loop);
       if (!replayModeRef.current) {
         tsEngine.update(time);
-        useGameStore.getState().syncMatch(tsEngine.getMatchSnapshot());
-        for (const event of tsEngine.drainEvents()) {
+        const snapshot = tsEngine.getMatchSnapshot();
+        useGameStore.getState().syncMatch(snapshot);
+        const frameEvents = tsEngine.drainEvents();
+        commentaryService.update(frameEvents, snapshot, tsEngine.player);
+        for (const event of frameEvents) {
           const state = tsEngine.getRenderState();
           const ballX = state.ball.pos.x;
           const ballY = state.ball.pos.z + 0.11;
@@ -179,12 +198,17 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
 
   const handleRematch = () => {
     tsEngine.rematch();
+    commentaryService.reset();
     useGameStore.getState().resetMatchUi();
     useGameStore.getState().syncMatch(tsEngine.getMatchSnapshot());
   };
 
   const handleMainMenu = () => {
     tsEngine.init();
+    commentaryService.reset();
+    const { commentaryEnabled, commentaryVolume } = useSettingsStore.getState();
+    commentaryService.setEnabled(useGameStore.getState().audioEnabled && commentaryEnabled);
+    commentaryService.setVolume(commentaryVolume);
     useGameStore.getState().resetMatchUi();
     onExit();
   };

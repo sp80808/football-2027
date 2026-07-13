@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { motion } from 'motion/react';
 import { X } from 'lucide-react';
 import { useSettingsStore, CameraMode, ZoomIntensity } from '../store/settingsStore';
 import { useGameStore } from '../store/gameStore';
+import { commentaryService } from '../audio/CommentaryService';
+import { Toggle } from '../ui/Toggle';
+import { fadeUp, motionTransition, springSmooth, useReducedMotion } from '../ui/motionPresets';
 
 export function SettingsOverlay() {
+  const reduced = useReducedMotion();
   const {
     settingsOpen,
     setSettingsOpen,
@@ -15,8 +20,14 @@ export function SettingsOverlay() {
     setZoomIntensity,
     showControlHints,
     setShowControlHints,
+    commentaryEnabled,
+    setCommentaryEnabled,
   } = useSettingsStore();
   const { audioEnabled, toggleAudio } = useGameStore();
+
+  useEffect(() => {
+    commentaryService.setEnabled(commentaryEnabled && audioEnabled);
+  }, [commentaryEnabled, audioEnabled]);
 
   if (!settingsOpen) return null;
 
@@ -35,7 +46,12 @@ export function SettingsOverlay() {
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-950/95 p-5 shadow-2xl">
+      <motion.div
+        initial={fadeUp.initial}
+        animate={fadeUp.animate}
+        transition={motionTransition(reduced, springSmooth)}
+        className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-950/95 p-5 shadow-2xl"
+      >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="m-0 text-lg font-bold text-white">Settings</h2>
           <button
@@ -66,18 +82,15 @@ export function SettingsOverlay() {
         </section>
 
         <section className="mb-5 space-y-3">
-          <label className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2.5">
-            <span className="text-sm text-white/80">Camera shake</span>
-            <input type="checkbox" checked={cameraShake} onChange={(e) => setCameraShake(e.target.checked)} className="accent-blue-500" />
-          </label>
-          <label className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2.5">
-            <span className="text-sm text-white/80">Control hints</span>
-            <input type="checkbox" checked={showControlHints} onChange={(e) => setShowControlHints(e.target.checked)} className="accent-blue-500" />
-          </label>
-          <label className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2.5">
-            <span className="text-sm text-white/80">Sound</span>
-            <input type="checkbox" checked={audioEnabled} onChange={toggleAudio} className="accent-blue-500" />
-          </label>
+          <Toggle label="Camera shake" checked={cameraShake} onChange={setCameraShake} />
+          <Toggle label="Control hints" checked={showControlHints} onChange={setShowControlHints} />
+          <Toggle
+            label="Sound"
+            checked={audioEnabled}
+            onChange={(on) => {
+              if (on !== audioEnabled) toggleAudio();
+            }}
+          />
         </section>
 
         <section>
@@ -95,7 +108,7 @@ export function SettingsOverlay() {
             ))}
           </div>
         </section>
-      </div>
+      </motion.div>
     </div>
   );
 }
