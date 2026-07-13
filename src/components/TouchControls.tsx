@@ -4,6 +4,7 @@ import { Vec2 } from '../engine/Math';
 import { ControllerFrame } from '../engine/Intent';
 import { InputSystem } from '../engine/InputSystem';
 import { Crosshair, Footprints, GitBranch, Sparkles, Wind, Target } from 'lucide-react';
+import { GLASS, iconProps } from '../ui/designTokens';
 import { springSnappy, tapScale, useReducedMotion } from '../ui/motionPresets';
 
 interface TouchControlsProps {
@@ -36,7 +37,7 @@ function TouchButtonPad({
       aria-label={label}
       whileTap={tapScale(reduced, 0.9)}
       transition={springSnappy}
-      className={`relative flex h-14 w-14 flex-col items-center justify-center overflow-hidden rounded-full border text-[9px] font-semibold uppercase tracking-wide transition-colors select-none touch-none ${active ? 'border-white/60 bg-white/25 text-white' : 'border-white/20 bg-black/50 text-white/80'} ${className}`}
+      className={`relative flex h-14 w-14 flex-col items-center justify-center overflow-hidden rounded-full border text-[9px] font-semibold uppercase tracking-wide transition-colors select-none touch-none ${active ? 'border-border-strong bg-white/25 text-text-primary' : `${GLASS.hud} text-text-secondary`} ${className}`}
       onPointerDown={(e) => {
         e.preventDefault();
         if (!reduced) setRippling(true);
@@ -124,7 +125,7 @@ export function TouchControls({ input }: TouchControlsProps) {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 md:hidden">
       <div
-        className="pointer-events-auto absolute bottom-8 left-6 h-28 w-28 rounded-full border border-white/15 bg-black/35 touch-none"
+        className={`pointer-events-auto absolute bottom-8 left-6 h-28 w-28 rounded-full touch-none ${GLASS.hud}`}
         onPointerDown={onStickStart}
         onPointerMove={onStickMove}
         onPointerUp={onStickEnd}
@@ -138,17 +139,17 @@ export function TouchControls({ input }: TouchControlsProps) {
 
       <div className="pointer-events-auto absolute bottom-8 right-6 flex flex-col items-end gap-3">
         <div className="flex gap-2">
-          <TouchButtonPad label="Lob" icon={<Wind size={16} />} active={held.has('lob')} onDown={() => setButton('lob', true)} onUp={() => setButton('lob', false)} />
-          <TouchButtonPad label="Thru" icon={<GitBranch size={16} />} active={held.has('through')} onDown={() => setButton('through', true)} onUp={() => setButton('through', false)} />
+          <TouchButtonPad label="Lob" icon={<Wind {...iconProps("sm")} />} active={held.has('lob')} onDown={() => setButton('lob', true)} onUp={() => setButton('lob', false)} />
+          <TouchButtonPad label="Thru" icon={<GitBranch {...iconProps("sm")} />} active={held.has('through')} onDown={() => setButton('through', true)} onUp={() => setButton('through', false)} />
         </div>
         <div className="flex gap-2">
-          <TouchButtonPad label="Pass" icon={<Footprints size={16} />} active={held.has('pass')} onDown={() => setButton('pass', true)} onUp={() => setButton('pass', false)} className="h-16 w-16" />
-          <TouchButtonPad label="Shot" icon={<Crosshair size={16} />} active={held.has('shoot')} onDown={() => setButton('shoot', true)} onUp={() => setButton('shoot', false)} className="h-16 w-16 border-red-400/40" />
+          <TouchButtonPad label="Pass" icon={<Footprints {...iconProps("sm")} />} active={held.has('pass')} onDown={() => setButton('pass', true)} onUp={() => setButton('pass', false)} className="h-16 w-16" />
+          <TouchButtonPad label="Shot" icon={<Crosshair {...iconProps("sm")} />} active={held.has('shoot')} onDown={() => setButton('shoot', true)} onUp={() => setButton('shoot', false)} className="h-16 w-16 border-accent-opponent-border" />
         </div>
         <div className="flex gap-2">
-          <TouchButtonPad label="Fin" icon={<Target size={16} />} active={held.has('finesse')} onDown={() => setButton('finesse', true)} onUp={() => setButton('finesse', false)} />
-          <TouchButtonPad label="Chip" icon={<Sparkles size={16} />} active={held.has('chip')} onDown={() => setButton('chip', true)} onUp={() => setButton('chip', false)} />
-          <TouchButtonPad label="Skill" icon={<Sparkles size={16} />} active={held.has('skill')} onDown={() => setButton('skill', true)} onUp={() => setButton('skill', false)} />
+          <TouchButtonPad label="Fin" icon={<Target {...iconProps("sm")} />} active={held.has('finesse')} onDown={() => setButton('finesse', true)} onUp={() => setButton('finesse', false)} />
+          <TouchButtonPad label="Chip" icon={<Sparkles {...iconProps("sm")} />} active={held.has('chip')} onDown={() => setButton('chip', true)} onUp={() => setButton('chip', false)} />
+          <TouchButtonPad label="Skill" icon={<Sparkles {...iconProps("sm")} />} active={held.has('skill')} onDown={() => setButton('skill', true)} onUp={() => setButton('skill', false)} />
         </div>
       </div>
     </div>
