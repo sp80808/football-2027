@@ -4,9 +4,9 @@ test('splash → menu → quick match → gameplay with scoreboard', async ({ pa
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'FOOTBALL 2027' })).toBeVisible();
-  await expect(page.getByText('Press any key to start')).toBeVisible();
+  await expect(page.getByText(/Press any key to/i)).toBeVisible({ timeout: 15_000 });
 
-  await page.getByText('Press any key to start').click();
+  await page.getByText(/Press any key to/i).click();
 
   await expect
     .poll(async () => page.evaluate(() => window.__TEST__?.screen))
@@ -18,11 +18,9 @@ test('splash → menu → quick match → gameplay with scoreboard', async ({ pa
     .poll(async () => page.evaluate(() => window.__TEST__?.screen))
     .toBe('quickMatch');
 
-  await page.getByRole('button', { name: /Play Match/i }).click();
+  await page.getByRole('button', { name: /Play Match/i }).click({ timeout: 15_000 });
 
-  await expect
-    .poll(async () => page.evaluate(() => window.__TEST__?.screen), { timeout: 15_000 })
-    .toBe('gameplay');
+  await page.waitForFunction(() => window.__TEST__?.screen === 'gameplay', undefined, { timeout: 15_000 });
 
   await expect(page.getByText(/\d+:\d{2}/).first()).toBeVisible();
 

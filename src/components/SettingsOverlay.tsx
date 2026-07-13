@@ -62,7 +62,7 @@ export function SettingsOverlay() {
       animate={{ opacity: 1 }}
       className="absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
     >
-      <motion.div initial={fadeUp.initial} animate={fadeUp.animate} transition={motionTransition(reduced, springSmooth)} className="w-full max-w-md"><GlassPanel variant="overlay" padding="lg" rounded="2xl">
+      <motion.div initial={fadeUp.initial} animate={fadeUp.animate} transition={motionTransition(reduced, springSmooth)} className="w-full max-w-md"><GlassPanel variant="overlay" padding="lg" className="rounded-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="m-0 text-lg font-bold text-text-primary">Settings</h2>
           <button type="button" onClick={() => setSettingsOpen(false)} className="rounded-lg border border-border bg-white/5 p-2 text-text-secondary hover:bg-white/10" aria-label="Close settings">

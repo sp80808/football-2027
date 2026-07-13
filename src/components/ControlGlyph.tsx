@@ -19,10 +19,13 @@ function DeviceBadge({ device }: { device: InputDevice }) {
   return <span className="inline-flex items-center gap-1.5 rounded-pill border border-border bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-muted"><Icon size={12}/>{deviceLabel(device)}</span>;
 }
 export function ControlBindingsPanel({ device: deviceProp, bindings=CONTROL_BINDINGS, title='Controls', compact=false, className='', footer }: { device?: InputDevice; bindings?: ActionBinding[]; title?: string; compact?: boolean; className?: string; footer?: React.ReactNode }) {
-  const device=deviceProp??useInputDevice(); const visible=bindings.filter(b=>getGlyphsForDevice(b,device).length>0);
+  const detectedDevice = useInputDevice();
+  const device = deviceProp ?? detectedDevice;
+  const visible=bindings.filter(b=>getGlyphsForDevice(b,device).length>0);
   return <div className={cn('rounded-xl border border-border bg-surface-elevated p-3 backdrop-blur-[var(--blur-glass)]',className)}><div className="mb-2.5 flex items-center justify-between gap-2"><p className={cn(TYPO.sectionLabel,'m-0')}>{title}</p><DeviceBadge device={device}/></div><ul className={compact?'space-y-1':'space-y-1.5'}>{visible.map(b=><ControlBindingRow key={b.id} binding={b} device={device} compact={compact}/>)}</ul>{footer??<p className="mt-2 text-[10px] leading-tight text-text-subtle">Hold to charge. Tap shoot twice for low driven.</p>}</div>;
 }
 export function ControlGlyphStrip({ actions, device: deviceProp, className='' }: { actions: GameAction[]; device?: InputDevice; className?: string }) {
-  const device=deviceProp??useInputDevice();
+  const detectedDevice = useInputDevice();
+  const device = deviceProp ?? detectedDevice;
   return <div className={cn('flex flex-wrap gap-2',className)}>{actions.map(actionId=>{const binding=CORE_BINDINGS.find(b=>b.id===actionId)??CONTROL_BINDINGS.find(b=>b.id===actionId); if(!binding) return null; const glyphs=getGlyphsForDevice(binding,device); if(!glyphs.length) return null; const Icon=binding.icon; return <div key={actionId} className="flex items-center gap-1.5 rounded-pill border border-border bg-surface-hud px-2 py-1"><Icon size={11} className="text-text-muted"/><span className="text-[10px] text-text-secondary">{binding.label}</span>{glyphs.slice(0,2).map((g,i)=><ControlGlyph key={`${actionId}-${i}`} token={g} device={device}/>)}</div>;})}</div>;
 }

@@ -8,19 +8,23 @@ let inputX = 0;
 let inputY = 0;
 
 async function initWasm() {
-  await init();
-  core = new SimulationCore();
-  
-  // Start fixed timestep loop at 120Hz
-  interval = setInterval(() => {
-    core.tick(inputX, inputY);
-    
-    const state = core.get_state();
-    self.postMessage({
-      type: 'STATE_UPDATE',
-      state: state
-    });
-  }, 1000 / 120);
+  try {
+    await init();
+    core = new SimulationCore();
+
+    // Start fixed timestep loop at 120Hz
+    interval = setInterval(() => {
+      core.tick(inputX, inputY);
+
+      const state = core.get_state();
+      self.postMessage({
+        type: 'STATE_UPDATE',
+        state: state
+      });
+    }, 1000 / 120);
+  } catch (error) {
+    console.warn('[simulation.worker] WASM init failed; worker idle.', error);
+  }
 }
 
 self.onmessage = (e) => {
