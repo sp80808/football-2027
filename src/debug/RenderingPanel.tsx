@@ -135,7 +135,7 @@ function createPitchTexture() {
   return texture;
 }
 
-function chargeConeColor(state: WorldState['player']) {
+function chargeConeColor(state: WorldState['homeTeam'][0]) {
   if (!state.isCharging) return 0x3399ff;
   if (state.chargeType === 'shoot') {
     if (state.shotModifier === 'finesse') return 0xc084fc;
@@ -492,14 +492,17 @@ export function RenderingPanel({
       southGoal.rotation.y = Math.PI;
       scene.add(southGoal);
 
-      const playerModel = createPlayer(0x1a56db, { number: 9 });
-      const keeperModel = createPlayer(0x84cc16, { number: 1, isKeeper: true });
-      const opponentModel = createPlayer(0xdc2626, { number: 9 });
-      const playerGroup = playerModel.group;
-      const keeperGroup = keeperModel.group;
-      const opponentGroup = opponentModel.group;
-      const chargeCone = playerModel.chargeCone;
-      scene.add(playerGroup, keeperGroup, opponentGroup);
+      const homeModels = Array.from({ length: 10 }, (_, i) => createPlayer(0x1a56db, { number: i + 2 }));
+      const awayModels = Array.from({ length: 10 }, (_, i) => createPlayer(0xdc2626, { number: i + 2 }));
+      const homeKeeperModel = createPlayer(0x84cc16, { number: 1, isKeeper: true });
+      const awayKeeperModel = createPlayer(0x84cc16, { number: 1, isKeeper: true });
+      
+      const homeGroups = homeModels.map(m => m.group);
+      const awayGroups = awayModels.map(m => m.group);
+      const homeKeeperGroup = homeKeeperModel.group;
+      const awayKeeperGroup = awayKeeperModel.group;
+      
+      scene.add(...homeGroups, ...awayGroups, homeKeeperGroup, awayKeeperGroup);
 
       const ball = new THREE.Mesh(
         new THREE.SphereGeometry(0.11, 32, 32),
@@ -568,37 +571,51 @@ export function RenderingPanel({
 
         elapsed += dt;
 
-        playerGroup.position.set(state.player.pos.x, 0, -state.player.pos.y);
-        playerGroup.rotation.y = Math.atan2(state.player.facing.x, state.player.facing.y);
-        chargeCone.visible = state.player.isCharging;
-        if (state.player.isCharging) {
-          const material = chargeCone.material as THREE.MeshStandardMaterial;
-          material.color.setHex(chargeConeColor(state.player));
-          const scale = 0.6 + state.player.chargeStart * 1.2;
-          chargeCone.scale.setScalar(scale);
+        const activePlayer = state.homeTeam[state.activeHomeIndex];
+
+        for (let i = 0; i < 10; i++) {
+          const hState = state.homeTeam[i];
+          const hModel = homeModels[i];
+          hModel.group.position.set(hState.pos.x, 0, -hState.pos.y);
+          hModel.group.rotation.y = Math.atan2(hState.facing.x, hState.facing.y);
+          animateRunner(hModel, hState.vel.mag(), elapsed + i * 0.1);
+          
+          hModel.chargeCone.visible = false;
+
+          const aState = state.awayTeam[i];
+          const aModel = awayModels[i];
+          aModel.group.position.set(aState.pos.x, 0, -aState.pos.y);
+          aModel.group.rotation.y = Math.atan2(aState.facing.x, aState.facing.y);
+          animateRunner(aModel, aState.vel.mag(), elapsed + i * 0.1 + 0.5);
         }
 
-        animateRunner(playerModel, state.player.vel.mag(), elapsed);
+        const activeCone = homeModels[state.activeHomeIndex].chargeCone;
+        activeCone.visible = activePlayer.isCharging;
+        if (activePlayer.isCharging) {
+          const material = activeCone.material as THREE.MeshStandardMaterial;
+          material.color.setHex(chargeConeColor(activePlayer));
+          const scale = 0.6 + activePlayer.chargeStart * 1.2;
+          activeCone.scale.setScalar(scale);
+        }
 
-        opponentGroup.position.set(state.opponent.pos.x, 0, -state.opponent.pos.y);
-        opponentGroup.rotation.y = Math.atan2(state.opponent.facing.x, state.opponent.facing.y);
-        animateRunner(opponentModel, state.opponent.vel.mag(), elapsed + 1.7);
+        homeKeeperGroup.position.set(state.homeKeeper.pos.x, 0, -state.homeKeeper.pos.y);
+        homeKeeperGroup.rotation.y = Math.atan2(state.homeKeeper.facing.x, state.homeKeeper.facing.y);
+        homeKeeperModel.torso.rotation.z += ((state.homeKeeper.aiState === 'diving' ? Math.PI / 3 : 0) - homeKeeperModel.torso.rotation.z) * 0.2;
 
-        keeperGroup.position.set(state.keeper.pos.x, 0, -state.keeper.pos.y);
-        keeperGroup.rotation.y = Math.atan2(state.keeper.facing.x, state.keeper.facing.y);
-        const targetTilt = state.keeper.aiState === 'diving' ? Math.PI / 3 : 0;
-        keeperModel.torso.rotation.z += (targetTilt - keeperModel.torso.rotation.z) * 0.2;
+        awayKeeperGroup.position.set(state.awayKeeper.pos.x, 0, -state.awayKeeper.pos.y);
+        awayKeeperGroup.rotation.y = Math.atan2(state.awayKeeper.facing.x, state.awayKeeper.facing.y);
+        awayKeeperModel.torso.rotation.z += ((state.awayKeeper.aiState === 'diving' ? Math.PI / 3 : 0) - awayKeeperModel.torso.rotation.z) * 0.2;
 
         crowd.update(elapsed);
 
-        if (state.player.isCharging) {
+        if (activePlayer.isCharging) {
           aimGroup.visible = true;
-          aimGroup.position.set(state.player.pos.x, 0, -state.player.pos.y);
-          aimGroup.rotation.y = Math.atan2(state.player.facing.x, state.player.facing.y);
-          const reach = 2 + (state.player.chargeStart / SimulationConfig.MAX_CHARGE_TIME) * 22;
+          aimGroup.position.set(activePlayer.pos.x, 0, -activePlayer.pos.y);
+          aimGroup.rotation.y = Math.atan2(activePlayer.facing.x, activePlayer.facing.y);
+          const reach = 2 + (activePlayer.chargeStart / SimulationConfig.MAX_CHARGE_TIME) * 22;
           aimLine.scale.z = reach;
           aimRing.position.z = -reach;
-          const col = chargeConeColor(state.player);
+          const col = chargeConeColor(activePlayer);
           (aimLine.material as THREE.MeshBasicMaterial).color.setHex(col);
           (aimRing.material as THREE.MeshBasicMaterial).color.setHex(col);
         } else {

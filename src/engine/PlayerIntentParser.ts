@@ -23,6 +23,7 @@ interface ParseContext {
   ballInControl: boolean;
   ballReceiving: boolean;
   incomingBallSpeed: number;
+  playerPos?: Vec2;
 }
 
 export function resolvePassModifier(frame: ControllerFrame): PassModifier {
@@ -119,6 +120,14 @@ export function parseIntent(frame: ControllerFrame, ctx: ParseContext): PlayerIn
     action = passModifier === 'lob' ? 'lob_pass' : 'short_pass';
   } else if (frame.throughPassHeld || frame.throughPassPressed) {
     action = passModifier === 'lob' ? 'lob_pass' : 'through_pass';
+  }
+
+  if (action === 'lob_pass' && ctx.playerPos) {
+    const isWing = Math.abs(ctx.playerPos.x) > cfg.PITCH_HALF_WIDTH - 18;
+    const isAttackingHalf = ctx.playerPos.y > cfg.PITCH_HALF_LENGTH * 0.25;
+    if (isWing && isAttackingHalf) {
+      action = 'cross';
+    }
   }
 
   return {

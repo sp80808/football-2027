@@ -80,26 +80,27 @@ export class CameraController {
     const preset = MODE_PRESETS[settings.mode];
     const zoom = ZOOM_SCALE[settings.zoomIntensity];
 
+    const activePlayer = state.homeTeam[state.activeHomeIndex];
     const ballSpeed = state.ball.vel.mag();
     const spread = Math.hypot(
-      state.player.pos.x - state.ball.pos.x,
-      state.player.pos.y - state.ball.pos.y,
+      activePlayer.pos.x - state.ball.pos.x,
+      activePlayer.pos.y - state.ball.pos.y,
     );
 
-    const ballWeight = preset.ballWeight + (state.player.isCharging ? 0.12 : 0);
+    const ballWeight = preset.ballWeight + (activePlayer.isCharging ? 0.12 : 0);
     const playerWeight = 1 - ballWeight;
 
-    const focusX = state.player.pos.x * playerWeight + state.ball.pos.x * ballWeight;
-    const focusZ = -(state.player.pos.y * playerWeight + state.ball.pos.y * ballWeight);
+    const focusX = activePlayer.pos.x * playerWeight + state.ball.pos.x * ballWeight;
+    const focusZ = -(activePlayer.pos.y * playerWeight + state.ball.pos.y * ballWeight);
 
-    const chargeBoost = state.player.isCharging
-      ? (state.player.chargeStart / 1.2) * (state.player.chargeType === 'shoot' ? 0.08 : 0.04)
+    const chargeBoost = activePlayer.isCharging
+      ? (activePlayer.chargeStart / 1.2) * (activePlayer.chargeType === 'shoot' ? 0.08 : 0.04)
       : 0;
 
     const targetDist = THREE.MathUtils.clamp(
       (preset.distBase + spread * preset.distSpread + ballSpeed * preset.distSpeed - chargeBoost * 8) * zoom,
-      14 * zoom,
-      34 * zoom,
+      preset.distMin * zoom,
+      preset.distMax * zoom,
     );
     const targetHeight = THREE.MathUtils.clamp(
       (preset.heightBase + spread * preset.heightSpread + chargeBoost * 3) * zoom,

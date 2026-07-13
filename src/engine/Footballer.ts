@@ -18,11 +18,19 @@ export type BallControlState =
 
 export type DefensiveState = 'none' | 'tackling' | 'sliding';
 
-export class Player {
+export class Footballer {
+  id: number;
+  team: 'home' | 'away';
+  
   pos = new Vec2(0, 0);
   vel = new Vec2(0, 0);
   facing = new Vec2(1, 0);
   controlState: BallControlState = 'free';
+
+  constructor(id: number, team: 'home' | 'away') {
+    this.id = id;
+    this.team = team;
+  }
   chargeStart = 0;
   isCharging = false;
   chargeType: 'pass' | 'shoot' = 'pass';
@@ -97,6 +105,7 @@ export class Player {
       ballInControl: this.controlState === 'under_control' || this.controlState === 'loose_nearby',
       ballReceiving,
       incomingBallSpeed: this.scratchBallVel.mag(),
+      playerPos: this.pos,
     });
 
     if (this.defensiveState !== 'none') {
@@ -205,7 +214,15 @@ export class Player {
 
   private updateLocomotion(dt: number, intent: ReturnType<typeof parseIntent>) {
     const cfg = SimulationConfig;
-    const targetSpeed = (intent.isContaining ? cfg.PLAYER_MAX_SPEED*cfg.CONTAIN_SPEED_MULT : intent.urgency>=1 ? cfg.PLAYER_SPRINT_SPEED : cfg.PLAYER_MAX_SPEED) * this.speedMul;
+    
+    if (intent.urgency >= 1 && this.vel.mag() > cfg.PLAYER_MAX_SPEED) {
+      this.stamina = Math.max(0, this.stamina - this.staminaDrainRate * 100 * dt);
+    } else {
+      this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegenRate * 100 * dt);
+    }
+    
+    const staminaPenalty = this.stamina < 10 ? 0.75 : 1.0;
+    const targetSpeed = (intent.isContaining ? cfg.PLAYER_MAX_SPEED*cfg.CONTAIN_SPEED_MULT : intent.urgency>=1 ? cfg.PLAYER_SPRINT_SPEED : cfg.PLAYER_MAX_SPEED) * this.speedMul * staminaPenalty;
     const moveDirection = intent.moveDir.clone();
 
     if (moveDirection.magSq() < 0.01) {
@@ -373,6 +390,18 @@ export class Player {
         lift = 4.5 * multiplier;
       }
 
+      const speedRatio = this.vel.mag() / cfg.PLAYER_SPRINT_SPEED;
+      const overcharge = Math.max(0, multiplier - 0.85) * 2.5;
+      const errorSpread = (speedRatio * 0.1 + overcharge * 0.15);
+      if (errorSpread > 0.01) {
+        const angle = Math.sin(this.pos.x * 13.37 + this.pos.y * 42.0) * errorSpread;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const nx = direction.x * cos - direction.y * sin;
+        const ny = direction.x * sin + direction.y * cos;
+        direction.set(nx, ny);
+      }
+
       const chipScale = intent.shotModifier === 'chip' ? 0.85 : 1;
       ball.kick(
         new Vec3(direction.x * power * chipScale, direction.y * power * chipScale, lift),
@@ -398,8 +427,26 @@ export class Player {
     } else if (action === 'long_pass') {
       lift = 4 * multiplier;
       powerScale = 1.15;
+    } else if (action === 'cross') {
+      lift = 6.0 * multiplier;
+      powerScale = 1.15;
+      const targetY = this.pos.y > 0 ? cfg.PITCH_HALF_LENGTH - 11 : -(cfg.PITCH_HALF_LENGTH - 11);
+      direction.set(0 - this.pos.x, targetY - this.pos.y);
+      if (direction.magSq() > 0.01) direction.normalize();
     } else {
       powerScale = 0.85 + multiplier * 0.2;
+    }
+
+    const speedRatio = this.vel.mag() / cfg.PLAYER_SPRINT_SPEED;
+    const overcharge = Math.max(0, multiplier - 0.9) * 2.0;
+    const errorSpread = (speedRatio * 0.08 + overcharge * 0.12);
+    if (errorSpread > 0.01) {
+      const angle = Math.sin(this.pos.x * 13.37 + this.pos.y * 42.0) * errorSpread;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const nx = direction.x * cos - direction.y * sin;
+      const ny = direction.x * sin + direction.y * cos;
+      direction.set(nx, ny);
     }
 
     ball.kick(new Vec3(

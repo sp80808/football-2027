@@ -1,15 +1,15 @@
 import { Vec2 } from './Math';
 import { InputSystem } from './InputSystem';
-import { Player } from './Player';
+import { Footballer } from './Footballer';
 import { Ball } from './Ball';
 import { Keeper } from './Keeper';
-import { Opponent } from './Opponent';
+import { TeamLogic } from './TeamLogic';
 import { SimulationConfig } from './SimulationConfig';
-import { WorldState, createEmptyWorldState, cloneWorldState, interpolateWorldState } from './WorldState';
+import { WorldState, createEmptyWorldState, copyWorldState, interpolateWorldState } from './WorldState';
 import { SeededRandom } from './SeededRandom';
 import { RingBuffer } from './RingBuffer';
 import { OffsideDetector } from './OffsideDetector';
-import { ControllerFrame } from './Intent';
+import { ControllerFrame, createEmptyFrame } from './Intent';
 import { ReplayData, ReplayRecorder } from './ReplayRecorder';
 import { MatchManager, MatchSnapshot } from './MatchManager';
 
@@ -23,7 +23,6 @@ export type SimEvent =
   | { type: 'offside'; side: 'player' | 'opponent' }
   | { type: 'tackle'; side: 'player' | 'opponent' }
   | { type: 'whistle' }
-  // RPG action events (side = 'player' attributes to the controlled footballer).
   | { type: 'pass_completed'; side: 'player' | 'opponent' }
   | { type: 'shot_on_target'; side: 'player' | 'opponent' }
   | { type: 'shot_off_target'; side: 'player' | 'opponent' }
@@ -31,10 +30,21 @@ export type SimEvent =
 
 export class GameEngine {
   input = new InputSystem();
-  player = new Player();
   ball = new Ball();
-  keeper = new Keeper();
-  opponent = new Opponent();
+  
+  homeTeam: Footballer[] = Array.from({ length: 10 }, (_, i) => new Footballer(i, 'home'));
+  awayTeam: Footballer[] = Array.from({ length: 10 }, (_, i) => new Footballer(i, 'away'));
+  homeKeeper = new Keeper();
+  awayKeeper = new Keeper();
+
+  homeLogic = new TeamLogic('home');
+  awayLogic = new TeamLogic('away');
+  
+  homeFrames: ControllerFrame[] = Array.from({ length: 10 }, () => createEmptyFrame());
+  awayFrames: ControllerFrame[] = Array.from({ length: 10 }, () => createEmptyFrame());
+
+  activeHomeIndex = 0; // Default active player
+
   random = new SeededRandom(DEFAULT_SIM_SEED);
   replayRecorder = new ReplayRecorder(DEFAULT_SIM_SEED);
   matchManager = new MatchManager();
@@ -64,14 +74,12 @@ export class GameEngine {
   private readonly playerPosAtPlay = new Vec2();
   private awaitingOffsideCheck = false;
   private passbackTimer = 0;
-  private previousControlState = this.player.controlState;
+  private previousControlState = this.homeTeam[0].controlState;
   public offsideLineY: number | null = null;
 
-  private readonly offsideAttacker = { id: 0, pos: new Vec2(), involvedInPlay: true };
-  private readonly offsideDefenderA = { id: 1, pos: new Vec2() };
-  private readonly offsideDefenderB = { id: 2, pos: new Vec2() };
-  private readonly offsideAttackers = [this.offsideAttacker];
-  private readonly offsideDefenders = [this.offsideDefenderA, this.offsideDefenderB];
+  // Offside detector caches
+  private readonly homeOffsideCache = Array.from({ length: 10 }, (_, i) => ({ id: i, pos: new Vec2(), involvedInPlay: true }));
+  private readonly awayOffsideCache = Array.from({ length: 11 }, (_, i) => ({ id: i, pos: new Vec2() })); // Includes Keeper
 
   get isGoalCelebration(): boolean {
     return this.matchManager.state.phase === 'goal';
@@ -96,7 +104,9 @@ export class GameEngine {
     this.random.setSeed(DEFAULT_SIM_SEED);
     this.replayRecorder = new ReplayRecorder(DEFAULT_SIM_SEED, options);
     this.matchManager.init();
-    this.resetPositions();
+    
+    // We let MatchManager handle initial positions when phase transitions to playing
+    
     if (options?.skipKickoff) {
       this.matchManager.state.phase = 'playing';
       this.matchManager.state.announcement = null;
@@ -112,15 +122,24 @@ export class GameEngine {
     this.lastGoalScorer = null;
     this.captureState(this.previousState, 0);
     this.captureState(this.currentState, 0);
-    this.renderState = cloneWorldState(this.currentState);
-    this.replayBuffer.push(cloneWorldState(this.currentState));
+    copyWorldState(this.currentState, this.renderState);
+    
+    // Allocate 600 empty states for the buffer to prevent gc in push
+    for (let i = 0; i < 600; i++) {
+        this.replayBuffer.push(createEmptyWorldState());
+    }
+    this.replayBuffer.clear(); // Reset pointers but keep objects
+    
+    const initialBufState = createEmptyWorldState();
+    copyWorldState(this.currentState, initialBufState);
+    this.replayBuffer.push(initialBufState);
   }
 
   rematch() {
     this.random.setSeed(DEFAULT_SIM_SEED);
     this.replayRecorder = new ReplayRecorder(DEFAULT_SIM_SEED);
     this.matchManager.rematch();
-    this.resetPositions();
+    
     this.prevMatchPhase = this.matchManager.state.phase;
     this.prevHomeScore = 0;
     this.prevAwayScore = 0;
@@ -133,9 +152,11 @@ export class GameEngine {
     this.offsideLineY = null;
     this.captureState(this.previousState, 0);
     this.captureState(this.currentState, 0);
-    this.renderState = cloneWorldState(this.currentState);
+    copyWorldState(this.currentState, this.renderState);
     this.replayBuffer.clear();
-    this.replayBuffer.push(cloneWorldState(this.currentState));
+    const initialBufState = createEmptyWorldState();
+    copyWorldState(this.currentState, initialBufState);
+    this.replayBuffer.push(initialBufState);
   }
 
   update(currentTime: number): WorldState {
@@ -156,16 +177,20 @@ export class GameEngine {
 
     this.accumulator += Math.min(frameTime, 0.25);
     while (this.accumulator >= this.dt) {
-      this.previousState = cloneWorldState(this.currentState);
+      copyWorldState(this.currentState, this.previousState);
       this.tick();
       this.captureState(this.currentState, this.previousState.tick + 1);
-      this.replayBuffer.push(cloneWorldState(this.currentState));
+      
+      const bufState = createEmptyWorldState();
+      copyWorldState(this.currentState, bufState);
+      this.replayBuffer.push(bufState);
+      
       this.replayRecorder.recordFrame(this.currentState.tick, this.input.currentFrame);
       this.accumulator -= this.dt;
       this.ticksThisSecond++;
     }
 
-    this.renderState = interpolateWorldState(this.previousState, this.currentState, this.accumulator / this.dt);
+    interpolateWorldState(this.previousState, this.currentState, this.accumulator / this.dt, this.renderState);
     return this.renderState;
   }
 
@@ -181,7 +206,7 @@ export class GameEngine {
     this.lastTpsTime = 0;
     this.pendingEvents = [];
     this.matchManager.init();
-    this.resetPositions();
+    
     if (options?.skipKickoff) {
       this.matchManager.state.phase = 'playing';
       this.matchManager.state.announcement = null;
@@ -197,15 +222,15 @@ export class GameEngine {
     this.lastGoalScorer = null;
     this.captureState(this.previousState, 0);
     this.captureState(this.currentState, 0);
-    this.renderState = cloneWorldState(this.currentState);
+    copyWorldState(this.currentState, this.renderState);
   }
 
   advanceTickWithInput(input: ControllerFrame): WorldState {
-    this.previousState = cloneWorldState(this.currentState);
+    copyWorldState(this.currentState, this.previousState);
     this.tick(input);
     const tick = this.previousState.tick + 1;
     this.captureState(this.currentState, tick);
-    this.renderState = cloneWorldState(this.currentState);
+    copyWorldState(this.currentState, this.renderState);
     return this.renderState;
   }
 
@@ -215,14 +240,19 @@ export class GameEngine {
     for (let i = 0; i < count; i++) {
       this.advanceTickWithInput(replayData.frames[i].input);
     }
-    return cloneWorldState(this.currentState);
+    copyWorldState(this.currentState, this.renderState);
+    return this.renderState;
   }
 
   buildInputReplayTimeline(replayData?: ReplayData): WorldState[] {
     const data = replayData ?? this.replayRecorder.getReplayData();
     const playback = new GameEngine();
     playback.resetForInputReplay(data.seed, { skipKickoff: data.skipKickoff });
-    return data.frames.map((frame) => playback.advanceTickWithInput(frame.input));
+    return data.frames.map((frame) => {
+        const s = createEmptyWorldState();
+        copyWorldState(playback.advanceTickWithInput(frame.input), s);
+        return s;
+    });
   }
 
   private tick(injectedInput?: ControllerFrame) {
@@ -230,7 +260,7 @@ export class GameEngine {
     const prevHome = this.prevHomeScore;
     const prevAway = this.prevAwayScore;
 
-    this.matchManager.update(this.dt, this.ball, this.player, this.keeper);
+    this.matchManager.update(this.dt, this.ball, this.homeTeam, this.awayTeam, this.homeKeeper, this.awayKeeper);
 
     const match = this.matchManager.state;
     this.scorePlayer = match.homeScore;
@@ -267,13 +297,39 @@ export class GameEngine {
       this.input.update();
     }
 
+    const humanInput = this.input.currentFrame;
+
+    // Handle Player Switching
+    if (humanInput.switchPressed) {
+      let bestDist = Infinity;
+      let bestIdx = this.activeHomeIndex;
+      for(let i=0; i<10; i++) {
+        if(i === this.activeHomeIndex) continue;
+        const dist = this.homeTeam[i].pos.distanceTo(this.ball.pos);
+        if(dist < bestDist) {
+          bestDist = dist;
+          bestIdx = i;
+        }
+      }
+      this.activeHomeIndex = bestIdx;
+    }
+
+    this.homeLogic.update(this.dt, this.homeTeam, this.homeFrames, this.ball, this.activeHomeIndex);
+    this.awayLogic.update(this.dt, this.awayTeam, this.awayFrames, this.ball, null);
+
+    // Inject human input into active player
+    this.homeFrames[this.activeHomeIndex] = humanInput;
+
+    const activePlayer = this.homeTeam[this.activeHomeIndex];
+
     const passReleased =
-      (this.input.currentFrame.passReleased || this.input.currentFrame.throughPassReleased) &&
-      this.player.isCharging &&
-      this.player.chargeType === 'pass';
+      (humanInput.passReleased || humanInput.throughPassReleased) &&
+      activePlayer.isCharging &&
+      activePlayer.chargeType === 'pass';
+      
     if (passReleased) {
       this.ballPlayPos.set(this.ball.pos.x, this.ball.pos.y);
-      this.playerPosAtPlay.copy(this.player.pos);
+      this.playerPosAtPlay.copy(activePlayer.pos);
       this.awaitingOffsideCheck = true;
       this.passbackTimer = SimulationConfig.KEEPER_PASSBACK_WINDOW;
     }
@@ -282,17 +338,27 @@ export class GameEngine {
     const velBefore = this.ball.vel.mag();
     const zVelBefore = this.ball.vel.z;
     const playerShooting =
-      this.input.currentFrame.shootReleased &&
-      this.player.isCharging &&
-      this.player.chargeType === 'shoot';
+      humanInput.shootReleased &&
+      activePlayer.isCharging &&
+      activePlayer.chargeType === 'shoot';
 
-    this.player.update(this.dt, this.input.currentFrame, this.ball, this.opponent);
-    const denyPassback = this.passbackTimer > 0 && this.ball.pos.y > SimulationConfig.PITCH_HALF_LENGTH - SimulationConfig.KEEPER_BOX_DEPTH;
-    this.keeper.update(this.dt, this.ball, this.input.currentFrame.keeperRushHeld, denyPassback);
-    this.opponent.update(this.dt, this.ball, this.player);
-    if (this.player.tackleWonThisTick) {
-      this.pendingEvents.push({ type: 'tackle', side: 'player' });
+    // Update outfields
+    for(let i=0; i<10; i++) {
+        this.homeTeam[i].update(this.dt, this.homeFrames[i], this.ball, undefined); // No direct opponent targeted for now
+        this.awayTeam[i].update(this.dt, this.awayFrames[i], this.ball, undefined);
+        
+        if (this.homeTeam[i].tackleWonThisTick) {
+          this.pendingEvents.push({ type: 'tackle', side: 'player' });
+        }
+        if (this.awayTeam[i].tackleWonThisTick) {
+          this.pendingEvents.push({ type: 'tackle', side: 'opponent' });
+        }
     }
+
+    const denyPassback = this.passbackTimer > 0 && this.ball.pos.y > SimulationConfig.PITCH_HALF_LENGTH - SimulationConfig.KEEPER_BOX_DEPTH;
+    this.homeKeeper.update(this.dt, this.ball, humanInput.keeperRushHeld, denyPassback);
+    this.awayKeeper.update(this.dt, this.ball, false, false); // AI keeper never rushes directly yet
+    
     this.ball.update(this.dt);
 
     this.updateOffsideLine();
@@ -306,44 +372,29 @@ export class GameEngine {
       const power = Math.min(1, (velAfter - velBefore) / 20);
       this.pendingEvents.push({ type: 'kick', power });
       if (power > 0.45) {
-        if (this.opponent.aiState === 'shooting') {
-          this.pendingEvents.push({ type: 'shot', side: 'opponent' });
-          if (this.isShotOnTarget('opponent')) this.pendingEvents.push({ type: 'shot_on_target', side: 'opponent' });
-          else this.pendingEvents.push({ type: 'shot_off_target', side: 'opponent' });
-        } else if (playerShooting) {
+        if (playerShooting) {
           this.pendingEvents.push({ type: 'shot', side: 'player' });
           if (this.isShotOnTarget('player')) this.pendingEvents.push({ type: 'shot_on_target', side: 'player' });
           else this.pendingEvents.push({ type: 'shot_off_target', side: 'player' });
         } else if (passReleased) {
-          // A meaningful pass kick by the player.
           this.pendingEvents.push({ type: 'pass_completed', side: 'player' });
         }
-      } else if (passReleased) {
-        // Soft pass / lay-off.
-        this.pendingEvents.push({ type: 'pass_completed', side: 'player' });
       }
     }
 
-    // Keeper save: the player's keeper deflected/punched an opponent shot.
-    if (this.keeper.savedThisTick) {
-      this.pendingEvents.push({ type: 'save', side: 'player' });
-    }
+    if (this.homeKeeper.savedThisTick) this.pendingEvents.push({ type: 'save', side: 'player' });
+    if (this.awayKeeper.savedThisTick) this.pendingEvents.push({ type: 'save', side: 'opponent' });
 
-    this.previousControlState = this.player.controlState;
+    this.previousControlState = activePlayer.controlState;
     this.enforceBoundaries();
   }
 
-  /**
-   * Project the ball's current velocity to the relevant goal line and check
-   * whether it would cross inside the posts and under the crossbar.
-   * Player attacks +Y (keeper end); opponent attacks -Y (player end).
-   */
   private isShotOnTarget(side: 'player' | 'opponent'): boolean {
     const cfg = SimulationConfig;
     const goalY = side === 'player' ? cfg.PITCH_HALF_LENGTH : -cfg.PITCH_HALF_LENGTH;
     const vy = this.ball.vel.y;
-    if (side === 'player' ? vy <= 0.5 : vy >= -0.5) return false; // not heading at goal
-    const t = (goalY - this.ball.pos.y) / vy; // seconds to goal line
+    if (side === 'player' ? vy <= 0.5 : vy >= -0.5) return false;
+    const t = (goalY - this.ball.pos.y) / vy;
     if (!isFinite(t) || t <= 0 || t > 2) return false;
     const xAtGoal = this.ball.pos.x + this.ball.vel.x * t;
     const zAtGoal = this.ball.pos.z + this.ball.vel.z * t - 0.5 * cfg.BALL_GRAVITY * t * t;
@@ -351,11 +402,15 @@ export class GameEngine {
   }
 
   private updateOffsideLine() {
-    this.offsideDefenderA.pos.copy(this.opponent.pos);
-    this.offsideDefenderB.pos.copy(this.keeper.pos);
+    for (let i=0; i<10; i++) {
+        this.homeOffsideCache[i].pos.copy(this.homeTeam[i].pos);
+        this.awayOffsideCache[i].pos.copy(this.awayTeam[i].pos);
+    }
+    this.awayOffsideCache[10].pos.copy(this.awayKeeper.pos);
+
     this.offsideLineY = this.offsideDetector.getOffsideLine(
-      this.offsideAttackers,
-      this.offsideDefenders,
+      this.homeOffsideCache,
+      this.awayOffsideCache,
       1,
     );
   }
@@ -363,7 +418,8 @@ export class GameEngine {
   private checkOffsideOnReceive() {
     if (!this.awaitingOffsideCheck) return;
 
-    const curr = this.player.controlState;
+    const activePlayer = this.homeTeam[this.activeHomeIndex];
+    const curr = activePlayer.controlState;
     const prev = this.previousControlState;
     const regainedControl =
       (curr === 'under_control' || curr === 'shielding') &&
@@ -371,14 +427,13 @@ export class GameEngine {
 
     if (!regainedControl) return;
 
-    this.offsideAttacker.pos.copy(this.playerPosAtPlay);
-    this.offsideDefenderA.pos.copy(this.opponent.pos);
-    this.offsideDefenderB.pos.copy(this.keeper.pos);
-
+    // We assume the active player is the one who received the ball.
+    // In a real 11v11, we should check which attacker received it, but this is a good start.
+    this.homeOffsideCache[0].pos.copy(this.playerPosAtPlay);
     const result = this.offsideDetector.checkOffside(
       this.ballPlayPos,
-      this.offsideAttackers,
-      this.offsideDefenders,
+      [this.homeOffsideCache[0]],
+      this.awayOffsideCache,
       1,
     );
 
@@ -391,95 +446,87 @@ export class GameEngine {
     this.ball.pos.y = this.ballPlayPos.y;
     this.ball.pos.z = 0;
     this.ball.vel.set(0, 0, 0);
-    this.player.controlState = 'free';
+    activePlayer.controlState = 'free';
     this.pendingEvents.push({ type: 'offside', side: 'player' }, { type: 'whistle' });
   }
 
   private resetKickoffExtras() {
-    this.player.controlState = 'free';
-    this.player.isCharging = false;
-    this.player.chargeStart = 0;
-    this.player.resetDefensive();
-    this.awaitingOffsideCheck = false;
-    this.passbackTimer = 0;
-    this.previousControlState = 'free';
-    this.opponent.reset();
+    for(let i=0; i<10; i++){
+        this.homeTeam[i].controlState = 'free';
+        this.homeTeam[i].isCharging = false;
+        this.homeTeam[i].chargeStart = 0;
+        this.awayTeam[i].controlState = 'free';
+        this.awayTeam[i].isCharging = false;
+        this.awayTeam[i].chargeStart = 0;
+    }
   }
 
-  private resetPositions() {
-    this.player.pos.set(0, -5);
-    this.player.vel.set(0, 0);
-    this.player.facing.set(0, 1);
-    this.player.controlState = 'free';
-    this.player.isCharging = false;
-    this.player.chargeStart = 0;
-    this.player.resetDefensive();
-    this.awaitingOffsideCheck = false;
-    this.passbackTimer = 0;
-    this.previousControlState = 'free';
-
-    this.ball.pos.set(0, 0, 0);
-    this.ball.vel.set(0, 0, 0);
-
-    this.keeper.pos.set(0, SimulationConfig.PITCH_HALF_LENGTH - 0.5);
-    this.keeper.facing.set(0, -1);
-    this.keeper.aiState = 'positioning';
-    this.opponent.reset();
+  private enforceBoundaries() {
+    const cfg = SimulationConfig;
+    if (this.ball.pos.x > cfg.PITCH_HALF_WIDTH) {
+      this.ball.pos.x = cfg.PITCH_HALF_WIDTH;
+      this.ball.vel.x *= -0.5;
+    } else if (this.ball.pos.x < -cfg.PITCH_HALF_WIDTH) {
+      this.ball.pos.x = -cfg.PITCH_HALF_WIDTH;
+      this.ball.vel.x *= -0.5;
+    }
+    if (this.ball.pos.y > cfg.PITCH_HALF_LENGTH) {
+      this.ball.pos.y = cfg.PITCH_HALF_LENGTH;
+      this.ball.vel.y *= -0.5;
+    } else if (this.ball.pos.y < -cfg.PITCH_HALF_LENGTH) {
+      this.ball.pos.y = -cfg.PITCH_HALF_LENGTH;
+      this.ball.vel.y *= -0.5;
+    }
   }
 
   private captureState(state: WorldState, tick: number) {
     state.tick = tick;
-    state.player.pos.copy(this.player.pos);
-    state.player.vel.copy(this.player.vel);
-    state.player.facing.copy(this.player.facing);
-    state.player.controlState = this.player.controlState;
-    state.player.isCharging = this.player.isCharging;
-    state.player.chargeStart = this.player.chargeStart;
-    state.player.chargeType = this.player.chargeType;
-    state.player.passModifier = this.player.activePassModifier;
-    state.player.shotModifier = this.player.activeShotModifier;
+    state.activeHomeIndex = this.activeHomeIndex;
+    
+    for (let i = 0; i < 10; i++) {
+        const hp = this.homeTeam[i];
+        const hs = state.homeTeam[i];
+        hs.pos.copy(hp.pos);
+        hs.vel.copy(hp.vel);
+        hs.facing.copy(hp.facing);
+        hs.controlState = hp.controlState;
+        hs.isCharging = hp.isCharging;
+        hs.chargeStart = hp.chargeStart;
+        hs.chargeType = hp.chargeType;
+        hs.passModifier = hp.activePassModifier;
+        hs.shotModifier = hp.activeShotModifier;
+        hs.stamina = hp.stamina;
+        hs.maxStamina = hp.maxStamina;
+
+        const ap = this.awayTeam[i];
+        const as = state.awayTeam[i];
+        as.pos.copy(ap.pos);
+        as.vel.copy(ap.vel);
+        as.facing.copy(ap.facing);
+        as.controlState = ap.controlState;
+        as.isCharging = ap.isCharging;
+        as.chargeStart = ap.chargeStart;
+        as.chargeType = ap.chargeType;
+        as.passModifier = ap.activePassModifier;
+        as.shotModifier = ap.activeShotModifier;
+        as.stamina = ap.stamina;
+        as.maxStamina = ap.maxStamina;
+    }
+
+    state.homeKeeper.pos.copy(this.homeKeeper.pos);
+    state.homeKeeper.facing.copy(this.homeKeeper.facing);
+    state.homeKeeper.aiState = this.homeKeeper.aiState;
+
+    state.awayKeeper.pos.copy(this.awayKeeper.pos);
+    state.awayKeeper.facing.copy(this.awayKeeper.facing);
+    state.awayKeeper.aiState = this.awayKeeper.aiState;
 
     state.ball.pos.copy(this.ball.pos);
     state.ball.vel.copy(this.ball.vel);
-
-    state.keeper.pos.copy(this.keeper.pos);
-    state.keeper.facing.copy(this.keeper.facing);
-    state.keeper.aiState = this.keeper.aiState;
-
-    state.opponent.pos.copy(this.opponent.pos);
-    state.opponent.vel.copy(this.opponent.vel);
-    state.opponent.facing.copy(this.opponent.facing);
-    state.opponent.aiState = this.opponent.aiState;
 
     state.scorePlayer = this.scorePlayer;
     state.scoreOpponent = this.scoreOpponent;
     state.lastGoalScorer = this.lastGoalScorer;
     state.offsideLineY = this.offsideLineY;
-  }
-
-  private enforceBoundaries() {
-    const cfg = SimulationConfig;
-    const inGoalMouth = Math.abs(this.ball.pos.x) <= cfg.GOAL_HALF_WIDTH && this.ball.pos.z <= cfg.GOAL_HEIGHT;
-
-    if (this.ball.pos.x > cfg.PITCH_HALF_WIDTH) {
-      this.ball.pos.x = cfg.PITCH_HALF_WIDTH;
-      this.ball.vel.x *= -0.55;
-    } else if (this.ball.pos.x < -cfg.PITCH_HALF_WIDTH) {
-      this.ball.pos.x = -cfg.PITCH_HALF_WIDTH;
-      this.ball.vel.x *= -0.55;
-    }
-
-    if (!inGoalMouth) {
-      if (this.ball.pos.y > cfg.PITCH_HALF_LENGTH) {
-        this.ball.pos.y = cfg.PITCH_HALF_LENGTH;
-        this.ball.vel.y *= -0.55;
-      } else if (this.ball.pos.y < -cfg.PITCH_HALF_LENGTH) {
-        this.ball.pos.y = -cfg.PITCH_HALF_LENGTH;
-        this.ball.vel.y *= -0.55;
-      }
-    }
-
-    this.player.pos.x = Math.max(-cfg.PITCH_HALF_WIDTH, Math.min(cfg.PITCH_HALF_WIDTH, this.player.pos.x));
-    this.player.pos.y = Math.max(-cfg.PITCH_HALF_LENGTH, Math.min(cfg.PITCH_HALF_LENGTH, this.player.pos.y));
   }
 }

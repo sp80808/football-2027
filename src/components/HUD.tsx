@@ -125,6 +125,8 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
     matchSeconds: 0,
     celebrating: false,
     offsideLine: null as number | null,
+    stamina: 100,
+    maxStamina: 100,
   });
 
   useEffect(() => {
@@ -147,23 +149,26 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
 
     const interval = window.setInterval(() => {
       const state = engine.getRenderState();
+      const activePlayer = state.homeTeam[state.activeHomeIndex];
       setDiagnostics({
         tps: engine.tps,
         fps,
-        playerSpeed: state.player.vel.mag().toFixed(1),
+        playerSpeed: activePlayer.vel.mag().toFixed(1),
         ballVelocity: state.ball.vel.mag().toFixed(1),
-        controlState: state.player.controlState,
-        keeperState: state.keeper.aiState,
-        charging: state.player.isCharging,
-        chargeType: state.player.chargeType,
-        chargePercent: Math.min(100, Math.round((state.player.chargeStart / SimulationConfig.MAX_CHARGE_TIME) * 100)),
-        passModifier: state.player.passModifier,
-        shotModifier: state.player.shotModifier,
+        controlState: activePlayer.controlState,
+        keeperState: state.homeKeeper.aiState,
+        charging: activePlayer.isCharging,
+        chargeType: activePlayer.chargeType,
+        chargePercent: Math.min(100, Math.round((activePlayer.chargeStart / SimulationConfig.MAX_CHARGE_TIME) * 100)),
+        passModifier: activePlayer.passModifier,
+        shotModifier: activePlayer.shotModifier,
         scorePlayer: state.scorePlayer,
         scoreOpponent: state.scoreOpponent,
         matchSeconds: engine.elapsedSeconds,
         celebrating: engine.isGoalCelebration,
         offsideLine: state.offsideLineY,
+        stamina: activePlayer.stamina,
+        maxStamina: activePlayer.maxStamina,
       });
     }, 80);
 
@@ -282,26 +287,29 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
         </div>
       </div>
 
-      {diagnostics.charging && (
-        <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 select-none">
-          <div className={`min-w-[180px] rounded-lg border px-4 py-2 backdrop-blur-sm ${diagnostics.chargeType === 'shoot' && diagnostics.shotModifier === 'power' ? 'border-red-400/40 bg-black/80 shadow-[0_0_24px_rgba(239,68,68,0.25)]' : 'border-white/10 bg-black/70'}`}>
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[11px] font-medium capitalize text-white/60">
-                {diagnostics.chargeType === 'shoot' ? 'Shooting' : 'Passing'}
-              </span>
-              <span className="font-mono text-[11px] font-bold text-white/80">
-                {diagnostics.chargePercent}%
-              </span>
+      <div className="pointer-events-none absolute bottom-6 left-6 select-none sm:bottom-8 sm:left-8">
+        <div className="flex w-48 flex-col gap-1 overflow-hidden rounded-xl border border-white/10 bg-black/60 shadow-lg backdrop-blur-md">
+          <div className="flex items-center gap-2 bg-gradient-to-r from-white/10 to-transparent px-3 py-1.5">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/80 text-[10px] font-bold text-white shadow-[0_0_8px_rgba(59,130,246,0.5)]">
+              P1
             </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+            <span className="text-xs font-semibold tracking-wide text-white">Player</span>
+          </div>
+          
+          <div className="px-3 pb-2 pt-1">
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/10">
               <div
-                className={`h-full rounded-full ${chargeBarClass()}`}
-                style={{ width: `${diagnostics.chargePercent}%` }}
+                className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-emerald-400 to-green-300 transition-all duration-300"
+                style={{ width: `${(diagnostics.stamina / Math.max(1, diagnostics.maxStamina)) * 100}%` }}
+              />
+              <div
+                className={`absolute left-0 top-0 h-full rounded-full opacity-90 transition-all duration-75 ${chargeBarClass()}`}
+                style={{ width: diagnostics.charging ? `${diagnostics.chargePercent}%` : '0%' }}
               />
             </div>
           </div>
         </div>
-      )}
+      </div>
 
       {activeModifierLabel && (
         <div className="pointer-events-none absolute left-1/2 top-24 -translate-x-1/2 select-none">

@@ -114,10 +114,20 @@ export class InputSystem {
     let lowDrivenTap = false;
 
     if (gamepad) {
-      if (Math.abs(gamepad.axes[0]) > 0.1) leftStick.x = gamepad.axes[0];
-      if (Math.abs(gamepad.axes[1]) > 0.1) leftStick.y = gamepad.axes[1];
-      if (Math.abs(gamepad.axes[2]) > 0.1) rightStick.x = gamepad.axes[2];
-      if (Math.abs(gamepad.axes[3]) > 0.1) rightStick.y = gamepad.axes[3];
+      const applyRadialDeadzone = (x: number, y: number, deadzone = 0.15) => {
+        const mag = Math.hypot(x, y);
+        if (mag < deadzone) return { x: 0, y: 0 };
+        const norm = Math.min(1, (mag - deadzone) / (1 - deadzone));
+        return { x: (x / mag) * norm, y: (y / mag) * norm };
+      };
+
+      const ls = applyRadialDeadzone(gamepad.axes[0] || 0, -(gamepad.axes[1] || 0));
+      leftStick.x = ls.x;
+      leftStick.y = ls.y;
+
+      const rs = applyRadialDeadzone(gamepad.axes[2] || 0, -(gamepad.axes[3] || 0));
+      rightStick.x = rs.x;
+      rightStick.y = rs.y;
       if (gamepad.buttons[7]?.pressed) sprint = gamepad.buttons[7].value;
       if (gamepad.buttons[6]?.pressed) shield = gamepad.buttons[6].value;
       pass = gamepad.buttons[0]?.pressed || false;

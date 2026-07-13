@@ -289,7 +289,7 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
 
       {!isMatchEnd && (
         <div className="absolute right-3 top-3 z-10 sm:right-4">
-          <Button variant="danger" size="sm" onClick={onExit}>
+          <Button variant="danger" size="sm" onClick={() => onExit()}>
             <X size={16} /> Exit
           </Button>
         </div>

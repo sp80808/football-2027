@@ -1,9 +1,9 @@
 import { Vec2, Vec3 } from './Math';
-import { BallControlState } from './Player';
-import { OpponentState } from './Opponent';
+import { BallControlState } from './Footballer';
 import { PassModifier, ShotModifier } from './Intent';
 
-export interface PlayerState {
+export interface FootballerState {
+  id: number;
   pos: Vec2;
   vel: Vec2;
   facing: Vec2;
@@ -13,6 +13,8 @@ export interface PlayerState {
   chargeType: 'pass' | 'shoot';
   passModifier: PassModifier;
   shotModifier: ShotModifier;
+  stamina: number;
+  maxStamina: number;
 }
 
 export interface BallState {
@@ -26,54 +28,46 @@ export interface KeeperWorldState {
   aiState: 'positioning' | 'diving' | 'recovering';
 }
 
-export interface OpponentWorldState {
-  pos: Vec2;
-  facing: Vec2;
-  vel: Vec2;
-  aiState: OpponentState;
-}
-
 export interface WorldState {
   tick: number;
-  player: PlayerState;
+  homeTeam: FootballerState[];
+  awayTeam: FootballerState[];
+  homeKeeper: KeeperWorldState;
+  awayKeeper: KeeperWorldState;
+  activeHomeIndex: number;
   ball: BallState;
-  keeper: KeeperWorldState;
-  opponent: OpponentWorldState;
   scorePlayer: number;
   scoreOpponent: number;
   lastGoalScorer: 'player' | 'opponent' | null;
   offsideLineY: number | null;
 }
 
+function createEmptyFootballer(id: number): FootballerState {
+  return {
+    id,
+    pos: new Vec2(0, -5),
+    vel: new Vec2(0, 0),
+    facing: new Vec2(0, 1),
+    controlState: 'free',
+    isCharging: false,
+    chargeStart: 0,
+    chargeType: 'pass',
+    passModifier: 'none',
+    shotModifier: 'none',
+    stamina: 100,
+    maxStamina: 100,
+  };
+}
+
 export function createEmptyWorldState(): WorldState {
   return {
     tick: 0,
-    player: {
-      pos: new Vec2(0, -5),
-      vel: new Vec2(0, 0),
-      facing: new Vec2(0, 1),
-      controlState: 'free',
-      isCharging: false,
-      chargeStart: 0,
-      chargeType: 'pass',
-      passModifier: 'none',
-      shotModifier: 'none',
-    },
-    ball: {
-      pos: new Vec3(0, 0, 0),
-      vel: new Vec3(0, 0, 0),
-    },
-    keeper: {
-      pos: new Vec2(0, 52),
-      facing: new Vec2(0, -1),
-      aiState: 'positioning',
-    },
-    opponent: {
-      pos: new Vec2(0, 25),
-      facing: new Vec2(0, -1),
-      vel: new Vec2(0, 0),
-      aiState: 'tracking',
-    },
+    homeTeam: Array.from({ length: 10 }, (_, i) => createEmptyFootballer(i)),
+    awayTeam: Array.from({ length: 10 }, (_, i) => createEmptyFootballer(i)),
+    homeKeeper: { pos: new Vec2(0, 52), facing: new Vec2(0, -1), aiState: 'positioning' },
+    awayKeeper: { pos: new Vec2(0, -52), facing: new Vec2(0, 1), aiState: 'positioning' },
+    activeHomeIndex: 0,
+    ball: { pos: new Vec3(0, 0, 0), vel: new Vec3(0, 0, 0) },
     scorePlayer: 0,
     scoreOpponent: 0,
     lastGoalScorer: null,
@@ -81,63 +75,86 @@ export function createEmptyWorldState(): WorldState {
   };
 }
 
-export function cloneWorldState(state: WorldState): WorldState {
-  return {
-    tick: state.tick,
-    player: {
-      pos: state.player.pos.clone(),
-      vel: state.player.vel.clone(),
-      facing: state.player.facing.clone(),
-      controlState: state.player.controlState,
-      isCharging: state.player.isCharging,
-      chargeStart: state.player.chargeStart,
-      chargeType: state.player.chargeType,
-      passModifier: state.player.passModifier,
-      shotModifier: state.player.shotModifier,
-    },
-    ball: {
-      pos: new Vec3(state.ball.pos.x, state.ball.pos.y, state.ball.pos.z),
-      vel: new Vec3(state.ball.vel.x, state.ball.vel.y, state.ball.vel.z),
-    },
-    keeper: {
-      pos: state.keeper.pos.clone(),
-      facing: state.keeper.facing.clone(),
-      aiState: state.keeper.aiState,
-    },
-    opponent: {
-      pos: state.opponent.pos.clone(),
-      facing: state.opponent.facing.clone(),
-      vel: state.opponent.vel.clone(),
-      aiState: state.opponent.aiState,
-    },
-    scorePlayer: state.scorePlayer,
-    scoreOpponent: state.scoreOpponent,
-    lastGoalScorer: state.lastGoalScorer,
-    offsideLineY: state.offsideLineY,
-  };
+export function copyWorldState(src: WorldState, dest: WorldState) {
+  dest.tick = src.tick;
+  dest.activeHomeIndex = src.activeHomeIndex;
+  for (let i = 0; i < 10; i++) {
+    const s = src.homeTeam[i];
+    const d = dest.homeTeam[i];
+    d.pos.copy(s.pos);
+    d.vel.copy(s.vel);
+    d.facing.copy(s.facing);
+    d.controlState = s.controlState;
+    d.isCharging = s.isCharging;
+    d.chargeStart = s.chargeStart;
+    d.chargeType = s.chargeType;
+    d.passModifier = s.passModifier;
+    d.shotModifier = s.shotModifier;
+    d.stamina = s.stamina;
+    d.maxStamina = s.maxStamina;
+
+    const sa = src.awayTeam[i];
+    const da = dest.awayTeam[i];
+    da.pos.copy(sa.pos);
+    da.vel.copy(sa.vel);
+    da.facing.copy(sa.facing);
+    da.controlState = sa.controlState;
+    da.isCharging = sa.isCharging;
+    da.chargeStart = sa.chargeStart;
+    da.chargeType = sa.chargeType;
+    da.passModifier = sa.passModifier;
+    da.shotModifier = sa.shotModifier;
+    da.stamina = sa.stamina;
+    da.maxStamina = sa.maxStamina;
+  }
+  
+  dest.homeKeeper.pos.copy(src.homeKeeper.pos);
+  dest.homeKeeper.facing.copy(src.homeKeeper.facing);
+  dest.homeKeeper.aiState = src.homeKeeper.aiState;
+
+  dest.awayKeeper.pos.copy(src.awayKeeper.pos);
+  dest.awayKeeper.facing.copy(src.awayKeeper.facing);
+  dest.awayKeeper.aiState = src.awayKeeper.aiState;
+
+  dest.ball.pos.copy(src.ball.pos);
+  dest.ball.vel.copy(src.ball.vel);
+
+  dest.scorePlayer = src.scorePlayer;
+  dest.scoreOpponent = src.scoreOpponent;
+  dest.lastGoalScorer = src.lastGoalScorer;
+  dest.offsideLineY = src.offsideLineY;
 }
 
-export function interpolateWorldState(previous: WorldState, next: WorldState, alpha: number): WorldState {
-  const result = cloneWorldState(next);
+export function interpolateWorldState(previous: WorldState, next: WorldState, alpha: number, result: WorldState) {
+  copyWorldState(next, result);
 
-  result.player.pos.x = previous.player.pos.x + (next.player.pos.x - previous.player.pos.x) * alpha;
-  result.player.pos.y = previous.player.pos.y + (next.player.pos.y - previous.player.pos.y) * alpha;
-  result.player.facing.x = previous.player.facing.x + (next.player.facing.x - previous.player.facing.x) * alpha;
-  result.player.facing.y = previous.player.facing.y + (next.player.facing.y - previous.player.facing.y) * alpha;
-  result.player.facing.normalize();
+  for (let i = 0; i < 10; i++) {
+    const p = previous.homeTeam[i];
+    const n = next.homeTeam[i];
+    const r = result.homeTeam[i];
+    r.pos.x = p.pos.x + (n.pos.x - p.pos.x) * alpha;
+    r.pos.y = p.pos.y + (n.pos.y - p.pos.y) * alpha;
+    r.facing.x = p.facing.x + (n.facing.x - p.facing.x) * alpha;
+    r.facing.y = p.facing.y + (n.facing.y - p.facing.y) * alpha;
+    r.facing.normalize();
+
+    const pa = previous.awayTeam[i];
+    const na = next.awayTeam[i];
+    const ra = result.awayTeam[i];
+    ra.pos.x = pa.pos.x + (na.pos.x - pa.pos.x) * alpha;
+    ra.pos.y = pa.pos.y + (na.pos.y - pa.pos.y) * alpha;
+    ra.facing.x = pa.facing.x + (na.facing.x - pa.facing.x) * alpha;
+    ra.facing.y = pa.facing.y + (na.facing.y - pa.facing.y) * alpha;
+    ra.facing.normalize();
+  }
 
   result.ball.pos.x = previous.ball.pos.x + (next.ball.pos.x - previous.ball.pos.x) * alpha;
   result.ball.pos.y = previous.ball.pos.y + (next.ball.pos.y - previous.ball.pos.y) * alpha;
   result.ball.pos.z = previous.ball.pos.z + (next.ball.pos.z - previous.ball.pos.z) * alpha;
 
-  result.keeper.pos.x = previous.keeper.pos.x + (next.keeper.pos.x - previous.keeper.pos.x) * alpha;
-  result.keeper.pos.y = previous.keeper.pos.y + (next.keeper.pos.y - previous.keeper.pos.y) * alpha;
-
-  result.opponent.pos.x = previous.opponent.pos.x + (next.opponent.pos.x - previous.opponent.pos.x) * alpha;
-  result.opponent.pos.y = previous.opponent.pos.y + (next.opponent.pos.y - previous.opponent.pos.y) * alpha;
-  result.opponent.facing.x = previous.opponent.facing.x + (next.opponent.facing.x - previous.opponent.facing.x) * alpha;
-  result.opponent.facing.y = previous.opponent.facing.y + (next.opponent.facing.y - previous.opponent.facing.y) * alpha;
-  result.opponent.facing.normalize();
-
-  return result;
+  result.homeKeeper.pos.x = previous.homeKeeper.pos.x + (next.homeKeeper.pos.x - previous.homeKeeper.pos.x) * alpha;
+  result.homeKeeper.pos.y = previous.homeKeeper.pos.y + (next.homeKeeper.pos.y - previous.homeKeeper.pos.y) * alpha;
+  
+  result.awayKeeper.pos.x = previous.awayKeeper.pos.x + (next.awayKeeper.pos.x - previous.awayKeeper.pos.x) * alpha;
+  result.awayKeeper.pos.y = previous.awayKeeper.pos.y + (next.awayKeeper.pos.y - previous.awayKeeper.pos.y) * alpha;
 }

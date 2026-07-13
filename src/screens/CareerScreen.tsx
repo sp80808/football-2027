@@ -10,6 +10,8 @@ import type { LeagueTeam } from '../career/careerSchemas';
 interface CareerScreenProps {
   onBack: () => void;
   onPlayMatch: () => void;
+  onOpenSquad: () => void;
+  onOpenTraining: () => void;
 }
 
 function sortStandings(standings: LeagueTeam[]): LeagueTeam[] {
@@ -22,7 +24,7 @@ function sortStandings(standings: LeagueTeam[]): LeagueTeam[] {
   });
 }
 
-export const CareerScreen: React.FC<CareerScreenProps> = ({ onBack, onPlayMatch }) => {
+export const CareerScreen: React.FC<CareerScreenProps> = ({ onBack, onPlayMatch, onOpenSquad, onOpenTraining }) => {
   const { clubName, seasonWeek, leaguePosition, fixturesPlayed, standings, getNextOpponent } = useCareerStore();
   const nextOpponent = getNextOpponent();
   const sortedStandings = useMemo(() => sortStandings(standings), [standings]);
@@ -82,8 +84,8 @@ export const CareerScreen: React.FC<CareerScreenProps> = ({ onBack, onPlayMatch 
         <div className="col-span-4">
           <Panel title="Manager Hub">
             <div className="flex flex-col gap-4 text-sm text-text-muted">
-              <div className="flex items-center gap-3"><Users {...iconProps('md')} /> Squad hub (coming soon)</div>
-              <div className="flex items-center gap-3"><TrendingUp {...iconProps('md')} /> Transfers (coming soon)</div>
+              <div className="flex cursor-pointer items-center gap-3 transition-colors hover:text-text-primary" onClick={onOpenSquad}><Users {...iconProps('md')} /> Squad Hub</div>
+              <div className="flex cursor-pointer items-center gap-3 transition-colors hover:text-text-primary" onClick={onOpenTraining}><TrendingUp {...iconProps('md')} /> Training Ground</div>
               <div className="flex items-center gap-3"><Trophy {...iconProps('md')} /> Objectives (coming soon)</div>
             </div>
           </Panel>

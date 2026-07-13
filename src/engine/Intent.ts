@@ -55,6 +55,34 @@ export interface ControllerFrame {
   keeperRushHeld: boolean;
 }
 
+export function createEmptyFrame(): ControllerFrame {
+  return {
+    leftStick: new Vec2(0, 0),
+    rightStick: new Vec2(0, 0),
+    sprint: 0,
+    shield: 0,
+    passPressed: false,
+    passHeld: false,
+    passReleased: false,
+    throughPassPressed: false,
+    throughPassHeld: false,
+    throughPassReleased: false,
+    shootPressed: false,
+    shootHeld: false,
+    shootReleased: false,
+    lobHeld: false,
+    finesseHeld: false,
+    chipHeld: false,
+    drivenHeld: false,
+    skillPressed: false,
+    lowDrivenTap: false,
+    tacklePressed: false,
+    slidePressed: false,
+    switchPressed: false,
+    keeperRushHeld: false,
+  };
+}
+
 export type TouchAction = 'cushion' | 'push' | 'shield' | 'knock_on';
 export type PassModifier = 'none' | 'through' | 'lob' | 'driven' | 'lob_through';
 export type ShotModifier = 'none' | 'finesse' | 'chip' | 'low_driven' | 'power';
@@ -67,7 +95,8 @@ export type BallAction =
   | 'driven_pass'
   | 'long_pass'
   | 'shot'
-  | 'first_time';
+  | 'first_time'
+  | 'cross';
 
 export interface PlayerIntent {
   moveDir: Vec2;

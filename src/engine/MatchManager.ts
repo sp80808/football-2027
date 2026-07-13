@@ -1,5 +1,5 @@
 import { Ball } from './Ball';
-import { Player } from './Player';
+import { Footballer } from './Footballer';
 import { Keeper } from './Keeper';
 import { SimulationConfig } from './SimulationConfig';
 
@@ -68,7 +68,7 @@ export class MatchManager {
     this.state.periodCountdown = Math.ceil(SimulationConfig.KICKOFF_DELAY_SECONDS);
   }
 
-  update(dt: number, ball: Ball, player: Player, keeper: Keeper) {
+  update(dt: number, ball: Ball, homeTeam: Footballer[], awayTeam: Footballer[], homeKeeper: Keeper, awayKeeper: Keeper) {
     if (this.state.phase === 'full_time') return;
 
     if (this.state.phase === 'halftime') {
@@ -77,7 +77,7 @@ export class MatchManager {
       if (this.halftimeTimer <= 0) {
         this.state.half = 2;
         this.beginKickoff();
-        this.resetKickoffPositions(ball, player, keeper);
+        this.resetKickoffPositions(ball, homeTeam, awayTeam, homeKeeper, awayKeeper);
       }
       return;
     }
@@ -88,7 +88,7 @@ export class MatchManager {
         this.state.phase = 'kickoff';
         this.state.announcement = 'KICK OFF';
         this.kickoffTimer = SimulationConfig.KICKOFF_DELAY_SECONDS;
-        this.resetKickoffPositions(ball, player, keeper);
+        this.resetKickoffPositions(ball, homeTeam, awayTeam, homeKeeper, awayKeeper);
       }
       return;
     }
@@ -108,13 +108,13 @@ export class MatchManager {
     if (this.state.phase !== 'playing') return;
 
     this.state.matchTime += dt;
-    this.checkPeriodTransitions(ball, player, keeper);
+    this.checkPeriodTransitions(ball, homeTeam, awayTeam, homeKeeper, awayKeeper);
     if (this.state.phase !== 'playing') return;
 
-    this.checkGoal(ball, player, keeper);
+    this.checkGoal(ball, homeTeam, awayTeam, homeKeeper, awayKeeper);
   }
 
-  private checkPeriodTransitions(ball: Ball, player: Player, keeper: Keeper) {
+  private checkPeriodTransitions(ball: Ball, homeTeam: Footballer[], awayTeam: Footballer[], homeKeeper: Keeper, awayKeeper: Keeper) {
     const cfg = SimulationConfig;
     const halfDuration = cfg.MATCH_DURATION_SECONDS / 2;
 
@@ -133,7 +133,7 @@ export class MatchManager {
     }
   }
 
-  private checkGoal(ball: Ball, player: Player, keeper: Keeper) {
+  private checkGoal(ball: Ball, homeTeam: Footballer[], awayTeam: Footballer[], homeKeeper: Keeper, awayKeeper: Keeper) {
     const cfg = SimulationConfig;
     const inGoalMouth =
       Math.abs(ball.pos.x) <= cfg.GOAL_HALF_WIDTH && ball.pos.z <= cfg.GOAL_HEIGHT;
@@ -146,27 +146,58 @@ export class MatchManager {
       this.state.phase = 'goal';
       this.state.announcement = 'GOAL!';
       this.celebrationTimer = SimulationConfig.GOAL_CELEBRATION_SECONDS;
-      this.resetKickoffPositions(ball, player, keeper);
+      this.resetKickoffPositions(ball, homeTeam, awayTeam, homeKeeper, awayKeeper);
     } else if (ball.pos.y <= -cfg.PITCH_HALF_LENGTH) {
       this.state.awayScore += 1;
       this.state.goalScorer = 'away';
       this.state.phase = 'goal';
       this.state.announcement = 'GOAL!';
       this.celebrationTimer = SimulationConfig.GOAL_CELEBRATION_SECONDS;
-      this.resetKickoffPositions(ball, player, keeper);
+      this.resetKickoffPositions(ball, homeTeam, awayTeam, homeKeeper, awayKeeper);
     }
   }
 
-  private resetKickoffPositions(ball: Ball, player: Player, keeper: Keeper) {
-    player.pos.set(0, -5);
-    player.vel.set(0, 0);
-    player.facing.set(0, 1);
+  private resetKickoffPositions(ball: Ball, homeTeam: Footballer[], awayTeam: Footballer[], homeKeeper: Keeper, awayKeeper: Keeper) {
+    // Basic 4-3-3 shape for reset. Home attacks +Y, Away attacks -Y.
+    const positions = [
+      { x: -18, y: 15 }, // LB
+      { x: -8, y: 12 }, // LCB
+      { x: 8, y: 12 },  // RCB
+      { x: 18, y: 15 },  // RB
+      { x: -12, y: 25 }, // LDM
+      { x: 12, y: 25 },  // RDM
+      { x: -22, y: 35 }, // LW
+      { x: 0, y: 32 },   // CAM
+      { x: 22, y: 35 },  // RW
+      { x: 0, y: 45 },   // ST
+    ];
+
+    for (let i = 0; i < 10; i++) {
+      homeTeam[i].pos.set(positions[i].x, -SimulationConfig.PITCH_HALF_LENGTH + positions[i].y);
+      homeTeam[i].vel.set(0, 0);
+      homeTeam[i].facing.set(0, 1);
+      homeTeam[i].controlState = 'free';
+
+      awayTeam[i].pos.set(positions[i].x, SimulationConfig.PITCH_HALF_LENGTH - positions[i].y);
+      awayTeam[i].vel.set(0, 0);
+      awayTeam[i].facing.set(0, -1);
+      awayTeam[i].controlState = 'free';
+    }
+    
+    // Put STs closer to the ball for kickoff
+    homeTeam[9].pos.set(0, -5);
+    awayTeam[9].pos.set(0, 5);
 
     ball.pos.set(0, 0, 0);
     ball.vel.set(0, 0, 0);
 
-    keeper.pos.set(0, SimulationConfig.PITCH_HALF_LENGTH - 0.5);
-    keeper.resetState();
+    homeKeeper.pos.set(0, -SimulationConfig.PITCH_HALF_LENGTH + 0.5);
+    homeKeeper.facing.set(0, 1);
+    homeKeeper.resetState();
+
+    awayKeeper.pos.set(0, SimulationConfig.PITCH_HALF_LENGTH - 0.5);
+    awayKeeper.facing.set(0, -1);
+    awayKeeper.resetState();
   }
 }
 
