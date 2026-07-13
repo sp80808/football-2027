@@ -1,6 +1,10 @@
 /**
- * Converts raw controller input and current context into a normalised intent.
- * This keeps hardware, replay, AI and future network input separate from physics.
+ * Converts raw controller input and current gameplay context into a normalised
+ * semantic intent. This is the canonical input boundary used by Player.
+ *
+ * Keep this function deterministic: all timing arrives through simulation state
+ * rather than browser time, allowing replay, AI and future network input to share
+ * the same path.
  */
 import { Vec2 } from './Math';
 import {
@@ -14,7 +18,7 @@ import {
 } from './Intent';
 import { SimulationConfig } from './SimulationConfig';
 
-interface ParseContext {
+export interface ParseContext {
   playerSpeed: number;
   chargeDuration: number;
   isCharging: boolean;
@@ -66,6 +70,8 @@ export function modifierLabel(
 export function parseIntent(frame: ControllerFrame, ctx: ParseContext): PlayerIntent {
   const cfg = SimulationConfig;
   const moveDir = frame.leftStick.clone();
+  if (moveDir.magSq() > 1) moveDir.normalize();
+
   const hasMoveInput = moveDir.magSq() > 0.01;
   const hasRightStick = frame.rightStick.magSq() > 0.1;
   const faceDir = hasRightStick
@@ -81,18 +87,21 @@ export function parseIntent(frame: ControllerFrame, ctx: ParseContext): PlayerIn
     desiredTouch = 'shield';
   } else if (urgency >= 1.0 && ctx.playerSpeed > cfg.PLAYER_SPRINT_SPEED * 0.7) {
     desiredTouch = 'knock_on';
-  } else if (ctx.playerSpeed < 2.0) {
+  } else if (
+    ctx.playerSpeed < 2.0 ||
+    (ctx.ballReceiving && ctx.incomingBallSpeed > 6 && urgency < 1)
+  ) {
     desiredTouch = 'cushion';
   }
 
-  const charge = Math.max(cfg.MIN_CHARGE_FRACTION, ctx.chargeDuration / cfg.MAX_CHARGE_TIME);
+  const rawCharge = ctx.chargeDuration / cfg.MAX_CHARGE_TIME;
+  const charge = Math.max(cfg.MIN_CHARGE_FRACTION, Math.min(1, rawCharge));
   const passModifier = resolvePassModifier(frame);
   const shotModifier = ctx.chargeType === 'shoot' ? resolveShotModifier(frame, charge) : 'none';
 
   let skillMove: SkillMove = 'none';
   if (frame.skillPressed && ctx.ballInControl) {
-    if (hasMoveInput) skillMove = 'step_over';
-    else skillMove = 'ball_roll';
+    skillMove = hasMoveInput ? 'step_over' : 'ball_roll';
   } else if (desiredTouch === 'knock_on' && hasMoveInput) {
     skillMove = 'knock_on';
   }
@@ -100,11 +109,20 @@ export function parseIntent(frame: ControllerFrame, ctx: ParseContext): PlayerIn
   let action: BallAction = 'none';
   if (ctx.ballReceiving && frame.shootReleased && ctx.isCharging && ctx.chargeType === 'shoot') {
     action = 'first_time';
-  } else if (ctx.ballReceiving && (frame.passReleased || frame.throughPassReleased) && ctx.isCharging && ctx.chargeType === 'pass') {
+  } else if (
+    ctx.ballReceiving &&
+    (frame.passReleased || frame.throughPassReleased) &&
+    ctx.isCharging &&
+    ctx.chargeType === 'pass'
+  ) {
     action = 'first_time';
   } else if (frame.shootReleased && ctx.isCharging && ctx.chargeType === 'shoot') {
     action = 'shot';
-  } else if ((frame.throughPassReleased || frame.passReleased) && ctx.isCharging && ctx.chargeType === 'pass') {
+  } else if (
+    (frame.throughPassReleased || frame.passReleased) &&
+    ctx.isCharging &&
+    ctx.chargeType === 'pass'
+  ) {
     if (passModifier === 'lob' || passModifier === 'lob_through') action = 'lob_pass';
     else if (passModifier === 'driven') action = 'driven_pass';
     else if (passModifier === 'through') action = 'through_pass';
@@ -115,7 +133,7 @@ export function parseIntent(frame: ControllerFrame, ctx: ParseContext): PlayerIn
   } else if (frame.passHeld || frame.passPressed) {
     action = passModifier === 'lob' ? 'lob_pass' : 'short_pass';
   } else if (frame.throughPassHeld || frame.throughPassPressed) {
-    action = passModifier === 'lob' ? 'lob_pass' : 'through_pass';
+    action = passModifier === 'lob_through' ? 'lob_pass' : 'through_pass';
   }
 
   return {
@@ -129,6 +147,8 @@ export function parseIntent(frame: ControllerFrame, ctx: ParseContext): PlayerIn
     skillMove,
     charge,
     isShielding: frame.shield > 0.5,
-    cancelRequested: false,
+    cancelRequested:
+      frame.shield > 0.5 &&
+      (frame.passHeld || frame.throughPassHeld || frame.shootHeld),
   };
 }
