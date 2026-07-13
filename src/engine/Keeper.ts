@@ -5,7 +5,7 @@ import { SimulationConfig } from './SimulationConfig';
 type KeeperState = 'positioning' | 'diving' | 'recovering';
 
 export class Keeper {
-  pos: Vec2 = new Vec2(0, 50);
+  pos: Vec2 = new Vec2(0, 52.0);
   facing: Vec2 = new Vec2(0, -1);
 
   /** Expose current AI state for HUD / debug overlay. */
@@ -31,7 +31,7 @@ export class Keeper {
   // ── Positioning ──────────────────────────────────────────────────────────
   private _updatePositioning(dt: number, ball: Ball) {
     const cfg = SimulationConfig;
-    const goalLineY = cfg.PITCH_HALF_LENGTH - 0.5;
+    const goalLineY = cfg.PITCH_HALF_LENGTH - 0.5; // 52.0
     const hw = cfg.GOAL_HALF_WIDTH;
 
     // Predict where ball will be after KEEPER_LOOKAHEAD_TIME seconds.

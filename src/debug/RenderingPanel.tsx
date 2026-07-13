@@ -26,6 +26,9 @@ const BALL_PANEL_DARK     = 0x1a1a1a;
 const PITCH_STRIPE_A      = 0x2d6a2d; // darker stripe
 const PITCH_STRIPE_B      = 0x338a33; // lighter stripe
 const LINE_COLOR          = 0xf0f0f0;
+// CPU opponent: red away kit
+const OPPONENT_BODY_COLOR = 0xdc2626; // red jersey
+const OPPONENT_HEAD_COLOR = 0xf5cba7;
 // Goal posts
 const POST_COLOR          = 0xffffff;
 const NET_COLOR           = 0xcccccc;
@@ -258,6 +261,8 @@ function createGoalGroup(facingPositiveZ: boolean): THREE.Group {
 export function RenderingPanel({ useWasm, engine, wasmClient }: RenderingPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [rendererLabel, setRendererLabel] = useState<string>('Initialising…');
+  const [goalFlash, setGoalFlash] = useState<'player' | 'opponent' | null>(null);
+  const goalFlashRef = useRef<'player' | 'opponent' | null>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -341,6 +346,10 @@ export function RenderingPanel({ useWasm, engine, wasmClient }: RenderingPanelPr
       const { group: keeperGroup, body: keeperBody } = createPlayerGroup(KEEPER_BODY_COLOR, KEEPER_HEAD_COLOR);
       scene.add(keeperGroup);
 
+      // ── CPU Opponent ────────────────────────────────────────────────────
+      const { group: opponentGroup } = createPlayerGroup(OPPONENT_BODY_COLOR, OPPONENT_HEAD_COLOR);
+      scene.add(opponentGroup);
+
       // ── Ball ───────────────────────────────────────────────────────────
       const ballMesh = createBallMesh();
       ballMesh.castShadow = true;
@@ -355,6 +364,16 @@ export function RenderingPanel({ useWasm, engine, wasmClient }: RenderingPanelPr
         reqId = requestAnimationFrame(renderLoop);
 
         const state: WorldState = useWasm ? wasmClient.getRenderState() : engine.getRenderState();
+
+        // Goal flash trigger
+        if (state.lastGoalScorer && state.lastGoalScorer !== goalFlashRef.current) {
+          goalFlashRef.current = state.lastGoalScorer;
+          setGoalFlash(state.lastGoalScorer);
+          setTimeout(() => {
+            goalFlashRef.current = null;
+            setGoalFlash(null);
+          }, 2500);
+        }
 
         // Player
         playerGroup.position.set(state.player.pos.x, 0, -state.player.pos.y);
@@ -371,6 +390,11 @@ export function RenderingPanel({ useWasm, engine, wasmClient }: RenderingPanelPr
         } else {
           playerCone.visible = false;
         }
+
+        // CPU Opponent
+        opponentGroup.position.set(state.opponent.pos.x, 0, -state.opponent.pos.y);
+        const opponentAngle = Math.atan2(state.opponent.facing.x, state.opponent.facing.y);
+        opponentGroup.rotation.y = opponentAngle;
 
         // Keeper
         keeperGroup.position.set(state.keeper.pos.x, 0, -state.keeper.pos.y);
@@ -397,17 +421,17 @@ export function RenderingPanel({ useWasm, engine, wasmClient }: RenderingPanelPr
         ballShadow.scale.set(shadowScale, shadowScale, shadowScale);
         (ballShadow.material as THREE.MeshBasicMaterial).opacity = 0.35 * shadowScale;
 
-        // Camera follow player with smooth lerp
-        const camTargetX = state.player.pos.x * 0.4;
-        const camTargetZ = -state.player.pos.y + 18;
-        camera.position.x += (camTargetX - camera.position.x) * 0.04;
-        camera.position.z += (camTargetZ - camera.position.z) * 0.04;
-        camera.position.y += (13 - camera.position.y) * 0.04;
-        camera.lookAt(
-          camera.position.x * 0.2,
-          0,
-          camera.position.z - 10,
-        );
+        // Camera — blend between player and ball, keep pitch in view
+        const focusX = (state.player.pos.x + state.ball.pos.x) * 0.5;
+        const focusZ = -(state.player.pos.y + state.ball.pos.y) * 0.5;
+        const camTargetX = focusX * 0.35;
+        const camTargetZ = focusZ + 22;
+        const camTargetY = 16;
+        camera.position.x += (camTargetX - camera.position.x) * 0.05;
+        camera.position.z += (camTargetZ - camera.position.z) * 0.05;
+        camera.position.y += (camTargetY - camera.position.y) * 0.05;
+        // Look at a stable world-space point a few metres ahead of the camera
+        camera.lookAt(camTargetX * 0.4, 0, focusZ);
 
         renderer!.render(scene, camera);
       };
@@ -432,10 +456,50 @@ export function RenderingPanel({ useWasm, engine, wasmClient }: RenderingPanelPr
   }, [useWasm, engine, wasmClient]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ display: 'block', width: '100%', height: '100%' }}
-      aria-label="Football simulation viewport"
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <canvas
+        ref={canvasRef}
+        style={{ display: 'block', width: '100%', height: '100%' }}
+        aria-label="Football simulation viewport"
+      />
+      {goalFlash && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            background: goalFlash === 'player'
+              ? 'radial-gradient(ellipse at center, rgba(30,120,255,0.18) 0%, transparent 70%)'
+              : 'radial-gradient(ellipse at center, rgba(220,50,50,0.18) 0%, transparent 70%)',
+            animation: 'goalFadeIn 0.3s ease-out',
+          }}
+        >
+          <p style={{
+            fontSize: '4rem',
+            fontWeight: 900,
+            letterSpacing: '0.06em',
+            color: goalFlash === 'player' ? '#60a5fa' : '#f87171',
+            textShadow: '0 0 40px currentColor',
+            fontFamily: 'system-ui, sans-serif',
+            margin: 0,
+          }}>
+            GOAL
+          </p>
+          <p style={{
+            fontSize: '1rem',
+            fontWeight: 600,
+            color: 'rgba(255,255,255,0.7)',
+            fontFamily: 'system-ui, sans-serif',
+            marginTop: '0.5rem',
+          }}>
+            {goalFlash === 'player' ? 'You scored!' : 'Opponent scored'}
+          </p>
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import { Vec2, Vec3 } from './Math';
 import { BallControlState } from './Player';
+import { OpponentState } from './Opponent';
 
 export interface PlayerState {
   pos: Vec2;
@@ -22,11 +23,22 @@ export interface KeeperState {
   aiState: 'positioning' | 'diving' | 'recovering';
 }
 
+export interface OpponentWorldState {
+  pos: Vec2;
+  facing: Vec2;
+  vel: Vec2;
+  aiState: OpponentState;
+}
+
 export interface WorldState {
   tick: number;
   player: PlayerState;
   ball: BallState;
   keeper: KeeperState;
+  opponent: OpponentWorldState;
+  scorePlayer: number;
+  scoreOpponent: number;
+  lastGoalScorer: 'player' | 'opponent' | null;
 }
 
 export function createEmptyWorldState(): WorldState {
@@ -49,7 +61,16 @@ export function createEmptyWorldState(): WorldState {
       pos: new Vec2(0, 52),
       facing: new Vec2(0, -1),
       aiState: 'positioning' as const
-    }
+    },
+    opponent: {
+      pos: new Vec2(0, 25),
+      facing: new Vec2(0, -1),
+      vel: new Vec2(0, 0),
+      aiState: 'tracking' as OpponentState
+    },
+    scorePlayer: 0,
+    scoreOpponent: 0,
+    lastGoalScorer: null,
   };
 }
 
@@ -73,7 +94,16 @@ export function cloneWorldState(state: WorldState): WorldState {
       pos: state.keeper.pos.clone(),
       facing: state.keeper.facing.clone(),
       aiState: state.keeper.aiState
-    }
+    },
+    opponent: {
+      pos: state.opponent.pos.clone(),
+      facing: state.opponent.facing.clone(),
+      vel: state.opponent.vel.clone(),
+      aiState: state.opponent.aiState
+    },
+    scorePlayer: state.scorePlayer,
+    scoreOpponent: state.scoreOpponent,
+    lastGoalScorer: state.lastGoalScorer,
   };
 }
 
@@ -97,6 +127,18 @@ export function interpolateWorldState(prev: WorldState, next: WorldState, alpha:
   result.keeper.pos.x = prev.keeper.pos.x + (next.keeper.pos.x - prev.keeper.pos.x) * alpha;
   result.keeper.pos.y = prev.keeper.pos.y + (next.keeper.pos.y - prev.keeper.pos.y) * alpha;
   result.keeper.aiState = next.keeper.aiState; // discrete — take next value
+
+  // Interpolate opponent
+  result.opponent.pos.x = prev.opponent.pos.x + (next.opponent.pos.x - prev.opponent.pos.x) * alpha;
+  result.opponent.pos.y = prev.opponent.pos.y + (next.opponent.pos.y - prev.opponent.pos.y) * alpha;
+  result.opponent.facing.x = prev.opponent.facing.x + (next.opponent.facing.x - prev.opponent.facing.x) * alpha;
+  result.opponent.facing.y = prev.opponent.facing.y + (next.opponent.facing.y - prev.opponent.facing.y) * alpha;
+  result.opponent.aiState = next.opponent.aiState;
+
+  // Score is discrete — always take next value
+  result.scorePlayer = next.scorePlayer;
+  result.scoreOpponent = next.scoreOpponent;
+  result.lastGoalScorer = next.lastGoalScorer;
 
   return result;
 }

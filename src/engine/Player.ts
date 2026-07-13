@@ -38,7 +38,7 @@ export class Player {
     });
 
     this.updateLocomotion(dt, intent);
-    this.updateBallInteraction(dt, intent, ball);
+    this.updateBallInteraction(dt, input, intent, ball);
   }
 
   private updateLocomotion(dt: number, intent: ReturnType<typeof parseIntent>) {
@@ -80,7 +80,7 @@ export class Player {
     this.pos.add(this.vel.clone().mul(dt));
   }
 
-  private updateBallInteraction(dt: number, intent: ReturnType<typeof parseIntent>, ball: Ball) {
+  private updateBallInteraction(dt: number, input: ControllerFrame, intent: ReturnType<typeof parseIntent>, ball: Ball) {
     const cfg = SimulationConfig;
     const distToBall = this.pos.distanceTo(new Vec2(ball.pos.x, ball.pos.y));
     const controlRadius = cfg.PLAYER_CONTROL_RADIUS;

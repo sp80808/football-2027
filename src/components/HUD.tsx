@@ -66,6 +66,8 @@ export function HUD({ engine, useWasm, onToggleWasm }: HUDProps) {
     charging: false,
     chargeType: 'pass' as 'pass' | 'shoot',
     chargePct: 0,
+    scorePlayer: 0,
+    scoreOpponent: 0,
   });
 
   useEffect(() => {
@@ -97,6 +99,8 @@ export function HUD({ engine, useWasm, onToggleWasm }: HUDProps) {
         charging: state.player.isCharging,
         chargeType: state.player.chargeType,
         chargePct: Math.min(100, Math.round((state.player.chargeStart / 1.5) * 100)),
+        scorePlayer: state.scorePlayer,
+        scoreOpponent: state.scoreOpponent,
       });
     }, 80);
 
@@ -166,6 +170,21 @@ export function HUD({ engine, useWasm, onToggleWasm }: HUDProps) {
             />
           </ul>
           <p className="text-[10px] text-white/30 mt-2 leading-tight">Hold pass/shoot to charge. Release to kick.</p>
+        </div>
+      </div>
+
+      {/* ── Scoreboard (top-centre) ─────────────────────────────────────── */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none select-none">
+        <div className="bg-black/60 backdrop-blur-sm border border-white/10 rounded-xl px-5 py-2 flex items-center gap-4">
+          <div className="flex flex-col items-center min-w-[48px]">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">You</span>
+            <span className="text-2xl font-black tabular-nums text-blue-300 leading-none mt-0.5">{diag.scorePlayer}</span>
+          </div>
+          <div className="text-white/20 text-lg font-light">—</div>
+          <div className="flex flex-col items-center min-w-[48px]">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">CPU</span>
+            <span className="text-2xl font-black tabular-nums text-red-300 leading-none mt-0.5">{diag.scoreOpponent}</span>
+          </div>
         </div>
       </div>
 
