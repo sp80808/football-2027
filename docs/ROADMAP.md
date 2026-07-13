@@ -252,6 +252,14 @@
 | Data accuracy | > 95% vs sources |
 | AI decision quality | Expert-rated "human-like" |
 
+
+
+---
+
+## Related documentation
+
+- [Design system reuse audit](./DESIGN_SYSTEM_REUSE_AUDIT.md) — Figma and code alignment audit (merged from `origin/main`).
+
 ---
 
 *Last Updated: 2026-07-13*
