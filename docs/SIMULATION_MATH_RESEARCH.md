@@ -4,6 +4,20 @@
 
 The current project already uses a deterministic 120 Hz fixed timestep, but several tunings are expressed as per-second exponential multipliers and ad-hoc constants. The ball model also mixes a fixed lift coefficient with an angular-velocity cross product, so Magnus acceleration can scale too aggressively with spin. Ground friction is currently exponential rather than a rolling/sliding regime.
 
+## Implemented integration
+
+`CameraController` now consumes `criticallyDampedStep()` directly for camera position, look target and shake recovery.
+
+The integration:
+
+- removes the previous explicit-Euler spring plus 60 Hz-authored damping multiplier;
+- caps unusually large render deltas after tab suspension;
+- keeps reusable Three.js vectors to avoid per-frame temporary allocation;
+- uses mode-specific natural frequencies instead of stiffness/damping pairs;
+- leaves all camera motion presentation-only and outside authoritative simulation state.
+
+This is the first live consumer required by issue #27. Keeper, pass and player-switch interception remain follow-up consumers and must refine the analytic solution against acceleration limits and sampled ball trajectories.
+
 ## Priority 1: exact, deterministic primitives
 
 Use `SimulationMath.ts` for:
