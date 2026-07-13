@@ -2,17 +2,21 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { RenderingPanel } from './debug/RenderingPanel';
 import { GameEngine } from './engine/GameEngine';
 import { SimulationWorkerClient } from './bridge/SimulationWorkerClient';
 import { HUD } from './components/HUD';
 import { WorldState } from './engine/WorldState';
+import { Play, Pause, SkipBack, SkipForward, ArrowRightLeft } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
+// Initialize the TS engine
 const tsEngine = new GameEngine();
 tsEngine.init();
+
+// Initialize the WASM worker client
 const wasmClient = new SimulationWorkerClient();
 wasmClient.init();
 
@@ -20,138 +24,177 @@ export default function App() {
   const [useWasm, setUseWasm] = useState(false);
   const [, setForceRender] = useState({});
   const [replayMode, setReplayMode] = useState(false);
+  const replayModeRef = useRef(false);
   const [replayFrame, setReplayFrame] = useState(0);
   const [showOffsideLine, setShowOffsideLine] = useState(false);
   const [isPlayingReplay, setIsPlayingReplay] = useState(false);
+  
   const replayItems = useRef<WorldState[]>([]);
 
   useEffect(() => {
-    let requestId = 0;
+    let reqId: number;
+
     const loop = (time: number) => {
-      requestId = requestAnimationFrame(loop);
-      tsEngine.update(time);
-      wasmClient.submitInput(tsEngine.input.currentFrame);
-      if (Math.random() < 0.1) setForceRender({});
+      reqId = requestAnimationFrame(loop);
+      
+      // Update TS engine which manages its own fixed timestep
+      // In replay mode we pause the engine so we don't miss anything
+      if (!replayModeRef.current) {
+        tsEngine.update(time);
+      }
+      
+      // Get current input to send to WASM
+      const input = tsEngine.input.currentFrame;
+
+      // Send input to WASM worker
+      wasmClient.submitInput(input);
+
+      // Throttled HUD update
+      if (Math.random() < 0.1) {
+        setForceRender({});
+      }
     };
-    requestId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(requestId);
+    reqId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(reqId);
   }, []);
 
+  // Handle replay playback
   useEffect(() => {
     if (!replayMode || !isPlayingReplay) return;
-    let requestId = 0;
+    
+    let reqId: number;
     let lastTime = performance.now();
-
-    const loop = (time: number) => {
-      requestId = requestAnimationFrame(loop);
-      if (time - lastTime > 1000 / 60) {
-        setReplayFrame((previous) => {
-          if (previous >= replayItems.current.length - 1) {
+    
+    const playLoop = (time: number) => {
+      reqId = requestAnimationFrame(playLoop);
+      const dt = time - lastTime;
+      // Replay runs at 60fps (or match physics tick rate if we want, but visually 60fps is fine)
+      if (dt > 1000 / 60) {
+        setReplayFrame(prev => {
+          if (prev >= replayItems.current.length - 1) {
             setIsPlayingReplay(false);
-            return previous;
+            return prev;
           }
-          return Math.min(previous + 2, replayItems.current.length - 1);
+          // Assuming replay was captured at 120Hz, playing at 60fps means 2 frames per tick for 1x speed
+          return Math.min(prev + 2, replayItems.current.length - 1);
         });
         lastTime = time;
       }
     };
-
-    requestId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(requestId);
+    
+    reqId = requestAnimationFrame(playLoop);
+    return () => cancelAnimationFrame(reqId);
   }, [replayMode, isPlayingReplay]);
 
-  const toggleReplay = () => {
+  const handleToggleReplay = () => {
     if (!replayMode) {
+      // Enter replay mode, capture buffer
       replayItems.current = tsEngine.replayBuffer.getItems();
       setReplayFrame(Math.max(0, replayItems.current.length - 1));
       setReplayMode(true);
+      replayModeRef.current = true;
       setIsPlayingReplay(false);
     } else {
       setReplayMode(false);
+      replayModeRef.current = false;
       setIsPlayingReplay(false);
     }
   };
 
-  const replayState = replayMode && replayItems.current.length > 0
-    ? replayItems.current[replayFrame]
+  const currentReplayState = replayMode && replayItems.current.length > 0 
+    ? replayItems.current[replayFrame] 
     : null;
 
   return (
-    <div className="h-screen w-screen overflow-hidden">
-      <RenderingPanel
-        useWasm={useWasm}
-        engine={tsEngine}
-        wasmClient={wasmClient}
-        replayState={replayState}
+    <div className="w-screen h-screen overflow-hidden">
+      <RenderingPanel 
+        useWasm={useWasm} 
+        engine={tsEngine} 
+        wasmClient={wasmClient} 
+        replayState={currentReplayState}
         showOffsideLine={replayMode && showOffsideLine}
       />
-
-      <button
-        onClick={toggleReplay}
-        className={`absolute left-4 top-14 z-10 flex items-center justify-center gap-2 rounded-md px-4 py-2 font-bold text-white shadow-md transition-colors ${replayMode ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700'}`}
-      >
-        {replayMode ? 'Exit Replay' : <><Play size={16} /> Instant Replay</>}
-      </button>
+      
+      <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
+        <button 
+          onClick={() => setUseWasm(!useWasm)}
+          className="px-4 py-2 bg-slate-800 text-white border border-slate-600 rounded-md cursor-pointer hover:bg-slate-700 transition-colors flex items-center gap-2 text-sm font-medium"
+        >
+          <ArrowRightLeft size={16} />
+          {useWasm ? 'Using WASM Core' : 'Using TS Core'}
+        </button>
+        <button 
+          onClick={handleToggleReplay}
+          className={`px-4 py-2 text-white border-none cursor-pointer rounded-md font-bold transition-colors shadow-md flex items-center justify-center gap-2 ${
+            replayMode ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+        >
+          {replayMode ? (
+            <>Exit Replay</>
+          ) : (
+            <>
+              <Play size={16} /> Instant Replay
+            </>
+          )}
+        </button>
+      </div>
 
       <AnimatePresence>
         {replayMode && (
-          <motion.div
+          <motion.div 
             initial={{ y: 100, opacity: 0, x: '-50%' }}
             animate={{ y: 0, opacity: 1, x: '-50%' }}
             exit={{ y: 100, opacity: 0, x: '-50%' }}
-            className="absolute bottom-10 left-1/2 z-20 flex min-w-[500px] flex-col items-center gap-5 rounded-xl border border-slate-700 bg-slate-900/90 p-6 text-white shadow-2xl backdrop-blur-sm"
+            className="absolute bottom-10 left-1/2 z-20 bg-slate-900/90 p-6 rounded-xl text-white flex flex-col items-center gap-5 min-w-[500px] shadow-2xl border border-slate-700 backdrop-blur-sm"
           >
-            <div className="flex w-full items-center justify-between">
-              <h2 className="m-0 flex items-center gap-2 text-lg font-bold text-red-500">
-                <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
+            <div className="flex justify-between w-full items-center">
+              <h2 className="m-0 text-red-500 text-lg font-bold flex items-center gap-2">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
                 REPLAY MODE
               </h2>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300 transition-colors hover:text-white">
-                <input
-                  type="checkbox"
-                  checked={showOffsideLine}
-                  onChange={(event) => setShowOffsideLine(event.target.checked)}
-                  className="rounded border-slate-600 bg-slate-800 text-blue-500"
+              <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-300 hover:text-white transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={showOffsideLine} 
+                  onChange={(e) => setShowOffsideLine(e.target.checked)}
+                  className="rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-900"
                 />
                 Show Offside Line
               </label>
             </div>
-
-            <div className="flex w-full items-center gap-4">
+            
+            <div className="w-full flex gap-4 items-center">
               <span className="font-mono text-sm text-slate-400">-5s</span>
-              <input
-                type="range"
-                min={0}
-                max={Math.max(0, replayItems.current.length - 1)}
-                value={replayFrame}
-                onChange={(event) => {
-                  setReplayFrame(Number.parseInt(event.target.value, 10));
+              <input 
+                type="range" 
+                min={0} 
+                max={Math.max(0, replayItems.current.length - 1)} 
+                value={replayFrame} 
+                onChange={(e) => {
+                  setReplayFrame(parseInt(e.target.value));
                   setIsPlayingReplay(false);
                 }}
-                className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-slate-700 accent-blue-500"
+                className="flex-1 cursor-pointer accent-blue-500 h-2 bg-slate-700 rounded-lg appearance-none"
               />
               <span className="font-mono text-sm text-slate-400">NOW</span>
             </div>
-
-            <div className="flex items-center gap-4">
-              <button
+            
+            <div className="flex gap-4 items-center">
+              <button 
                 onClick={() => { setReplayFrame(0); setIsPlayingReplay(false); }}
-                className="flex cursor-pointer items-center justify-center bg-transparent p-2 text-slate-300 transition-colors hover:text-white"
-                aria-label="Replay from start"
+                className="bg-transparent border-none text-slate-300 hover:text-white cursor-pointer p-2 flex items-center justify-center transition-colors"
               >
                 <SkipBack size={24} />
               </button>
-              <button
-                onClick={() => setIsPlayingReplay((playing) => !playing)}
-                className="flex cursor-pointer items-center justify-center rounded-full bg-blue-500 p-3 text-white shadow-lg transition-transform hover:scale-105 hover:bg-blue-600 active:scale-95"
-                aria-label={isPlayingReplay ? 'Pause replay' : 'Play replay'}
+              <button 
+                onClick={() => setIsPlayingReplay(!isPlayingReplay)}
+                className="bg-blue-500 hover:bg-blue-600 border-none text-white cursor-pointer p-3 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 shadow-lg"
               >
                 {isPlayingReplay ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
               </button>
-              <button
+              <button 
                 onClick={() => { setReplayFrame(Math.max(0, replayItems.current.length - 1)); setIsPlayingReplay(false); }}
-                className="flex cursor-pointer items-center justify-center bg-transparent p-2 text-slate-300 transition-colors hover:text-white"
-                aria-label="Jump to live"
+                className="bg-transparent border-none text-slate-300 hover:text-white cursor-pointer p-2 flex items-center justify-center transition-colors"
               >
                 <SkipForward size={24} />
               </button>
@@ -160,7 +203,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <HUD engine={tsEngine} useWasm={useWasm} onToggleWasm={() => setUseWasm((value) => !value)} />
+      <HUD engine={tsEngine} />
     </div>
   );
 }
