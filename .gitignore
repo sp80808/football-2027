@@ -1,8 +1,28 @@
+# Dependencies
 node_modules/
+
+# Build output
 build/
 dist/
 coverage/
+
+# Rust (simulation crate)
+simulation/target/
+
+# macOS / AppleDouble (common on external volumes)
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+__MACOSX/
+Icon?
+
+# Logs
 *.log
+
+# Environment
 .env*
 !.env.example
+
+# IDE-local (runtime state, not shared project config)
+.cursor/
