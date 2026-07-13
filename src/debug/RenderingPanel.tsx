@@ -6,6 +6,8 @@ import { SimulationWorkerClient } from '../bridge/SimulationWorkerClient';
 import { GameEngine } from '../engine/GameEngine';
 import { addStadiumToScene } from '../scene/createStadium';
 import { BallTrail, GoalCelebration } from '../scene/effects';
+import { CameraController } from '../camera/CameraController';
+import { useSettingsStore } from '../store/settingsStore';
 
 interface RenderingPanelProps {
   useWasm: boolean;
@@ -66,6 +68,21 @@ function createPitchTexture() {
   texture.anisotropy = 8;
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
+}
+
+function chargeConeColor(state: WorldState['player']) {
+  if (!state.isCharging) return 0x3399ff;
+  if (state.chargeType === 'shoot') {
+    if (state.shotModifier === 'finesse') return 0xc084fc;
+    if (state.shotModifier === 'chip') return 0xfacc15;
+    if (state.shotModifier === 'low_driven') return 0xfb923c;
+    if (state.shotModifier === 'power') return 0xef4444;
+    return 0xff3333;
+  }
+  if (state.passModifier === 'through' || state.passModifier === 'lob_through') return 0x22c55e;
+  if (state.passModifier === 'lob') return 0x22d3ee;
+  if (state.passModifier === 'driven') return 0x93c5fd;
+  return 0x3399ff;
 }
 
 function createShadow(radius: number, opacity: number) {
@@ -245,6 +262,8 @@ export function RenderingPanel({
 
       ballTrail = new BallTrail(scene);
       const goalCelebration = new GoalCelebration(scene);
+      const cameraController = new CameraController();
+      let lastBallSpeed = 0;
       let lastFrameTime = performance.now();
 
       const offsideLine = new THREE.Mesh(
@@ -269,7 +288,7 @@ export function RenderingPanel({
         chargeCone.visible = state.player.isCharging;
         if (state.player.isCharging) {
           const material = chargeCone.material as THREE.MeshStandardMaterial;
-          material.color.setHex(state.player.chargeType === 'shoot' ? 0xff3333 : 0x3399ff);
+          material.color.setHex(chargeConeColor(state.player));
           const scale = 0.6 + state.player.chargeStart * 1.2;
           chargeCone.scale.setScalar(scale);
         }
@@ -290,13 +309,19 @@ export function RenderingPanel({
         ballShadow.scale.setScalar(shadowScale);
         (ballShadow.material as THREE.MeshBasicMaterial).opacity = 0.35 * shadowScale;
 
-        const ballSpeed = state.ball.vel.mag();
-        ballTrail!.update(ball.position, ballSpeed);
+        const ballSpeedTrail = state.ball.vel.mag();
+        ballTrail!.update(ball.position, ballSpeedTrail);
 
         if (state.lastGoalScorer && state.lastGoalScorer !== previousGoal.current) {
           previousGoal.current = state.lastGoalScorer;
           setGoalFlash(state.lastGoalScorer);
           goalCelebration.trigger(ball.position.clone());
+          const settings = useSettingsStore.getState();
+          cameraController.addShake({ type: 'goal', intensity: 1 }, {
+            mode: settings.cameraMode,
+            shakeEnabled: settings.cameraShake,
+            zoomIntensity: settings.zoomIntensity,
+          });
           if (goalTimeout) window.clearTimeout(goalTimeout);
           goalTimeout = window.setTimeout(() => {
             previousGoal.current = null;
@@ -304,20 +329,28 @@ export function RenderingPanel({
           }, 2500);
         }
 
+        const ballSpeed = state.ball.vel.mag();
+        if (ballSpeed - lastBallSpeed > 8) {
+          const settings = useSettingsStore.getState();
+          cameraController.addShake({ type: 'kick', intensity: Math.min(1, (ballSpeed - lastBallSpeed) / 16) }, {
+            mode: settings.cameraMode,
+            shakeEnabled: settings.cameraShake,
+            zoomIntensity: settings.zoomIntensity,
+          });
+        }
+        lastBallSpeed = ballSpeed;
+
         goalCelebration.update(dt);
 
         offsideLine.visible = showOffsideLineRef.current;
         if (offsideLine.visible) offsideLine.position.z = -state.opponent.pos.y;
 
-        const focusX = (state.player.pos.x + state.ball.pos.x) * 0.5;
-        const focusZ = -(state.player.pos.y + state.ball.pos.y) * 0.5;
-        const spread = Math.hypot(state.player.pos.x - state.ball.pos.x, state.player.pos.y - state.ball.pos.y);
-        const cameraDistance = THREE.MathUtils.clamp(20 + spread * 0.35 + ballSpeed * 0.12, 18, 32);
-        const cameraHeight = THREE.MathUtils.clamp(14 + spread * 0.08, 12, 20);
-        camera.position.x += (focusX * 0.35 - camera.position.x) * 0.05;
-        camera.position.z += (focusZ + cameraDistance - camera.position.z) * 0.05;
-        camera.position.y += (cameraHeight - camera.position.y) * 0.05;
-        camera.lookAt(focusX * 0.4, 0, focusZ);
+        const settings = useSettingsStore.getState();
+        cameraController.update(camera, state, dt, {
+          mode: settings.cameraMode,
+          shakeEnabled: settings.cameraShake,
+          zoomIntensity: settings.zoomIntensity,
+        });
         renderer.render(scene, camera);
       };
 

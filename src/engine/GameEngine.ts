@@ -11,7 +11,8 @@ import { RingBuffer } from './RingBuffer';
 export type SimEvent =
   | { type: 'kick'; power: number }
   | { type: 'bounce'; intensity: number }
-  | { type: 'goal' }
+  | { type: 'goal'; scorer: 'player' | 'opponent' }
+  | { type: 'shot'; side: 'player' | 'opponent' }
   | { type: 'whistle' };
 
 export class GameEngine {
@@ -115,6 +116,10 @@ export class GameEngine {
     this.input.update();
     const velBefore = this.ball.vel.mag();
     const zVelBefore = this.ball.vel.z;
+    const playerShooting =
+      this.input.currentFrame.shootReleased &&
+      this.player.isCharging &&
+      this.player.chargeType === 'shoot';
 
     this.player.update(this.dt, this.input.currentFrame, this.ball);
     this.keeper.update(this.dt, this.ball);
@@ -126,7 +131,15 @@ export class GameEngine {
     }
     const velAfter = this.ball.vel.mag();
     if (velAfter - velBefore > 6) {
-      this.pendingEvents.push({ type: 'kick', power: Math.min(1, (velAfter - velBefore) / 20) });
+      const power = Math.min(1, (velAfter - velBefore) / 20);
+      this.pendingEvents.push({ type: 'kick', power });
+      if (power > 0.45) {
+        if (this.opponent.aiState === 'shooting') {
+          this.pendingEvents.push({ type: 'shot', side: 'opponent' });
+        } else if (playerShooting) {
+          this.pendingEvents.push({ type: 'shot', side: 'player' });
+        }
+      }
     }
 
     this.checkGoals();
@@ -142,12 +155,12 @@ export class GameEngine {
       this.scorePlayer++;
       this.lastGoalScorer = 'player';
       this.goalPauseTicks = this.goalPauseDurationTicks;
-      this.pendingEvents.push({ type: 'goal' }, { type: 'whistle' });
+      this.pendingEvents.push({ type: 'goal', scorer: 'player' }, { type: 'whistle' });
     } else if (this.ball.pos.y <= -cfg.PITCH_HALF_LENGTH) {
       this.scoreOpponent++;
       this.lastGoalScorer = 'opponent';
       this.goalPauseTicks = this.goalPauseDurationTicks;
-      this.pendingEvents.push({ type: 'goal' }, { type: 'whistle' });
+      this.pendingEvents.push({ type: 'goal', scorer: 'opponent' }, { type: 'whistle' });
     }
   }
 

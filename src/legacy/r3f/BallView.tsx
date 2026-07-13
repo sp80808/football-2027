@@ -1,8 +1,8 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { GameEngine } from '../engine/GameEngine';
-import { SimulationConfig } from '../engine/SimulationConfig';
+import { GameEngine } from '../../engine/GameEngine';
+import { SimulationConfig } from '../../engine/SimulationConfig';
 
 export function BallView({ engine }: { engine: GameEngine }) {
   const meshRef = useRef<THREE.Mesh>(null);

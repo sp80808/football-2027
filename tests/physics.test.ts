@@ -21,6 +21,12 @@ function makeFrame(overrides: Partial<ControllerFrame> = {}): ControllerFrame {
     shootPressed: false,
     shootHeld: false,
     shootReleased: false,
+    lobHeld: false,
+    finesseHeld: false,
+    chipHeld: false,
+    drivenHeld: false,
+    skillPressed: false,
+    lowDrivenTap: false,
     tacklePressed: false,
     slidePressed: false,
     switchPressed: false,
@@ -68,6 +74,7 @@ describe('player intent parser', () => {
     playerSpeed: 4,
     chargeDuration: 0,
     isCharging: false,
+    chargeType: 'pass' as const,
     ballGrounded: true,
     ballInControl: true,
   };
@@ -94,8 +101,29 @@ describe('player intent parser', () => {
   it('emits a shot action on release after charging', () => {
     expect(parseIntent(
       makeFrame({ shootReleased: true }),
-      { ...context, chargeDuration: 0.8, isCharging: true },
+      { ...context, chargeDuration: 0.8, isCharging: true, chargeType: 'shoot' },
     ).action).toBe('shot');
+  });
+
+  it('detects finesse shot modifier', () => {
+    const intent = parseIntent(
+      makeFrame({ shootHeld: true, finesseHeld: true }),
+      { ...context, chargeType: 'shoot' },
+    );
+    expect(intent.shotModifier).toBe('finesse');
+  });
+
+  it('detects lob pass modifier', () => {
+    const intent = parseIntent(
+      makeFrame({ passHeld: true, lobHeld: true }),
+      context,
+    );
+    expect(intent.passModifier).toBe('lob');
+    expect(intent.action).toBe('lob_pass');
+  });
+
+  it('detects through ball modifier', () => {
+    expect(parseIntent(makeFrame({ throughPassHeld: true }), context).passModifier).toBe('through');
   });
 });
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Sky, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import { GameEngine } from '../engine/GameEngine';
+import { GameEngine } from '../../engine/GameEngine';
 import { Pitch } from './Pitch';
 import { PlayerView } from './PlayerView';
 import { KeeperView } from './KeeperView';

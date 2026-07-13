@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { GameEngine } from '../engine/GameEngine';
+import { GameEngine } from '../../engine/GameEngine';
 
 export function KeeperView({ engine }: { engine: GameEngine }) {
   const groupRef = useRef<THREE.Group>(null);

@@ -2,15 +2,22 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { RenderingPanel } from './debug/RenderingPanel';
+
+const RenderingPanel = React.lazy(() =>
+  import('./debug/RenderingPanel').then((m) => ({ default: m.RenderingPanel })),
+);
 import { GameEngine } from './engine/GameEngine';
 import { SimulationWorkerClient } from './bridge/SimulationWorkerClient';
 import { HUD } from './components/HUD';
+import { TouchControls } from './components/TouchControls';
+import { SettingsOverlay } from './components/SettingsOverlay';
 import { WorldState } from './engine/WorldState';
 import { audioManager } from './audio/AudioManager';
+import { useGameStore } from './store/gameStore';
+import { displayMatchMinute } from './utils/matchTime';
 
 const tsEngine = new GameEngine();
 tsEngine.init();
@@ -47,12 +54,31 @@ export default function App() {
       requestId = requestAnimationFrame(loop);
       if (!replayModeRef.current) {
         tsEngine.update(time);
+        useGameStore.getState().syncFromEngine(
+          { player: tsEngine.scorePlayer, opponent: tsEngine.scoreOpponent },
+          tsEngine.elapsedSeconds,
+        );
         for (const event of tsEngine.drainEvents()) {
           if (event.type === 'kick') audioManager.playKick(event.power);
           else if (event.type === 'bounce') audioManager.playBounce(event.intensity);
-          else if (event.type === 'goal') audioManager.playGoal();
-          else if (event.type === 'whistle') audioManager.playWhistle();
+          else if (event.type === 'goal') {
+            audioManager.playGoal();
+            useGameStore.getState().pushPlayEvent({
+              side: event.scorer === 'player' ? 'home' : 'away',
+              kind: 'goal',
+              matchMinute: displayMatchMinute(tsEngine.elapsedSeconds),
+              label: 'GOAL',
+            });
+          } else if (event.type === 'shot') {
+            useGameStore.getState().pushPlayEvent({
+              side: event.side === 'player' ? 'home' : 'away',
+              kind: 'shot',
+              matchMinute: displayMatchMinute(tsEngine.elapsedSeconds),
+              label: 'SHOT',
+            });
+          } else if (event.type === 'whistle') audioManager.playWhistle();
         }
+        useGameStore.getState().prunePlayEvents();
       }
       wasmClient.submitInput(tsEngine.input.currentFrame);
       if (Math.random() < 0.1) setForceRender({});
@@ -104,17 +130,25 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen overflow-hidden">
-      <RenderingPanel
-        useWasm={useWasm}
-        engine={tsEngine}
-        wasmClient={wasmClient}
-        replayState={replayState}
-        showOffsideLine={replayMode && showOffsideLine}
-      />
+      <Suspense
+        fallback={
+          <div className="flex h-full w-full items-center justify-center bg-slate-950 text-sm text-slate-400">
+            Loading pitch…
+          </div>
+        }
+      >
+        <RenderingPanel
+          useWasm={useWasm}
+          engine={tsEngine}
+          wasmClient={wasmClient}
+          replayState={replayState}
+          showOffsideLine={replayMode && showOffsideLine}
+        />
+      </Suspense>
 
       <button
         onClick={toggleReplay}
-        className={`absolute left-4 top-14 z-10 flex items-center justify-center gap-2 rounded-md px-4 py-2 font-bold text-white shadow-md transition-colors ${replayMode ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+        className={`absolute left-4 top-[5.5rem] z-10 flex items-center justify-center gap-2 rounded-md px-4 py-2 font-bold text-white shadow-md transition-colors ${replayMode ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-700'}`}
       >
         {replayMode ? 'Exit Replay' : <><Play size={16} /> Instant Replay</>}
       </button>
@@ -187,6 +221,8 @@ export default function App() {
       </AnimatePresence>
 
       <HUD engine={tsEngine} useWasm={useWasm} onToggleWasm={() => setUseWasm((value) => !value)} />
+      <TouchControls input={tsEngine.input} />
+      <SettingsOverlay />
     </div>
   );
 }

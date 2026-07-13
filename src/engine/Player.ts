@@ -1,5 +1,5 @@
 import { Vec2, Vec3 } from './Math';
-import { ControllerFrame } from './Intent';
+import { ControllerFrame, BallAction, PassModifier, ShotModifier } from './Intent';
 import { Ball } from './Ball';
 import { SimulationConfig } from './SimulationConfig';
 import { parseIntent } from './PlayerIntentParser';
@@ -21,7 +21,9 @@ export class Player {
   chargeStart = 0;
   isCharging = false;
   chargeType: 'pass' | 'shoot' = 'pass';
-  private chargingThroughPass = false;
+  activePassModifier: PassModifier = 'none';
+  activeShotModifier: ShotModifier = 'none';
+  skillBurstTimer = 0;
   private touchTimer = 0;
 
   update(dt: number, input: ControllerFrame, ball: Ball) {
@@ -29,12 +31,38 @@ export class Player {
       playerSpeed: this.vel.mag(),
       chargeDuration: this.chargeStart,
       isCharging: this.isCharging,
+      chargeType: this.chargeType,
       ballGrounded: ball.pos.z <= 0,
       ballInControl: this.controlState === 'under_control' || this.controlState === 'loose_nearby',
     });
 
+    if (this.skillBurstTimer > 0) this.skillBurstTimer -= dt;
+    this.applySkillMove(dt, intent.skillMove, ball);
+
     this.updateLocomotion(dt, intent);
     this.updateBallInteraction(dt, input, intent, ball);
+  }
+
+  private applySkillMove(dt: number, skill: string, ball: Ball) {
+    const cfg = SimulationConfig;
+    if (skill === 'none' || this.skillBurstTimer > 0) return;
+    if (this.controlState !== 'under_control' && this.controlState !== 'loose_nearby') return;
+
+    if (skill === 'step_over') {
+      const perp = new Vec2(-this.facing.y, this.facing.x);
+      this.vel.add(perp.mul(cfg.PLAYER_ACCEL * 2.5 * dt));
+      this.skillBurstTimer = 0.18;
+    } else if (skill === 'ball_roll') {
+      const perp = new Vec2(-this.facing.y, this.facing.x);
+      ball.vel.x += perp.x * 4;
+      ball.vel.y += perp.y * 4;
+      this.skillBurstTimer = 0.22;
+    } else if (skill === 'knock_on') {
+      const burst = this.facing.clone().mul(cfg.PLAYER_SPRINT_SPEED * 0.35);
+      ball.vel.x += burst.x;
+      ball.vel.y += burst.y;
+      this.skillBurstTimer = 0.15;
+    }
   }
 
   private updateLocomotion(dt: number, intent: ReturnType<typeof parseIntent>) {
@@ -85,47 +113,20 @@ export class Player {
       this.controlState = 'free';
     }
 
-    const shootHeld = input.shootHeld || input.shootPressed;
-    const passHeld = input.passHeld || input.passPressed;
-    const throughHeld = input.throughPassHeld || input.throughPassPressed;
-    const shootReleased = input.shootReleased;
-    const passReleased = input.passReleased || input.throughPassReleased;
+    this.activePassModifier = intent.passModifier;
+    this.activeShotModifier = intent.shotModifier;
 
-    if (!this.isCharging) {
-      if (shootHeld) {
-        this.isCharging = true;
-        this.chargeType = 'shoot';
-        this.chargingThroughPass = false;
-        this.chargeStart = 0;
-      } else if (passHeld || throughHeld) {
-        this.isCharging = true;
-        this.chargeType = 'pass';
-        this.chargingThroughPass = throughHeld;
-        this.chargeStart = 0;
-      }
-    }
+    const kickAction = this.resolveKickAction(input, intent);
+    this.updateCharging(dt, input, kickAction);
 
-    if (this.isCharging) {
-      this.chargeStart = Math.min(cfg.MAX_CHARGE_TIME, this.chargeStart + dt);
-    }
-
-    const shouldKick =
-      (this.chargeType === 'shoot' && shootReleased)
-      || (this.chargeType === 'pass' && passReleased);
-
-    if (shouldKick && this.isCharging) {
+    if (kickAction && this.isCharging) {
       if (this.controlState === 'under_control' || this.controlState === 'loose_nearby') {
-        const power = this.chargeType === 'shoot' ? cfg.SHOT_POWER_BASE : cfg.PASS_POWER_BASE;
-        const multiplier = Math.max(cfg.MIN_CHARGE_FRACTION, this.chargeStart / cfg.MAX_CHARGE_TIME);
-        const lift = this.chargeType === 'shoot'
-          ? 3 * multiplier
-          : this.chargingThroughPass ? 2.5 * multiplier : 0.5 * multiplier;
-        const direction = this.facing.clone();
-        ball.kick(new Vec3(direction.x * power * multiplier, direction.y * power * multiplier, lift));
+        this.executeKick(ball, kickAction, intent);
       }
       this.isCharging = false;
-      this.chargingThroughPass = false;
       this.chargeStart = 0;
+      this.activePassModifier = 'none';
+      this.activeShotModifier = 'none';
     }
 
     if ((this.controlState === 'under_control' || this.controlState === 'shielding') && !this.isCharging) {
@@ -158,6 +159,98 @@ export class Player {
       ball.vel.x += (this.pos.x + shieldOffset.x - ball.pos.x) * 20 * dt;
       ball.vel.y += (this.pos.y + shieldOffset.y - ball.pos.y) * 20 * dt;
     }
+  }
+
+  private resolveKickAction(input: ControllerFrame, intent: ReturnType<typeof parseIntent>): BallAction | null {
+    if (!this.isCharging) return null;
+    if (this.chargeType === 'shoot' && input.shootReleased) return 'shot';
+    if (this.chargeType === 'pass' && (input.passReleased || input.throughPassReleased)) {
+      return intent.action === 'none' ? 'short_pass' : intent.action;
+    }
+    return null;
+  }
+
+  private updateCharging(dt: number, input: ControllerFrame, releasing: BallAction | null) {
+    const cfg = SimulationConfig;
+    const shootHeld = input.shootHeld || input.shootPressed;
+    const passHeld = input.passHeld || input.passPressed;
+    const throughHeld = input.throughPassHeld || input.throughPassPressed;
+
+    if (!this.isCharging && !releasing) {
+      if (shootHeld) {
+        this.isCharging = true;
+        this.chargeType = 'shoot';
+        this.chargeStart = 0;
+      } else if (passHeld || throughHeld) {
+        this.isCharging = true;
+        this.chargeType = 'pass';
+        this.chargeStart = 0;
+      }
+    }
+
+    if (this.isCharging && !releasing) {
+      this.chargeStart = Math.min(cfg.MAX_CHARGE_TIME, this.chargeStart + dt);
+    }
+  }
+
+  private executeKick(ball: Ball, action: BallAction, intent: ReturnType<typeof parseIntent>) {
+    const cfg = SimulationConfig;
+    const multiplier = Math.max(cfg.MIN_CHARGE_FRACTION, this.chargeStart / cfg.MAX_CHARGE_TIME);
+    const direction = this.facing.clone();
+
+    if (action === 'shot' || action === 'first_time') {
+      const power = cfg.SHOT_POWER_BASE * multiplier;
+      let lift = 3 * multiplier;
+      let spin: Vec3 | undefined;
+
+      if (intent.shotModifier === 'finesse') {
+        lift = 2.2 * multiplier;
+        const curl = new Vec3(-direction.y, direction.x, 0);
+        spin = curl.mul(18 * multiplier);
+      } else if (intent.shotModifier === 'chip') {
+        lift = 7 * multiplier;
+      } else if (intent.shotModifier === 'low_driven') {
+        lift = 0.35 * multiplier;
+      } else if (intent.shotModifier === 'power') {
+        lift = 4.5 * multiplier;
+      }
+
+      const chipScale = intent.shotModifier === 'chip' ? 0.85 : 1;
+      ball.kick(
+        new Vec3(direction.x * power * chipScale, direction.y * power * chipScale, lift),
+        spin,
+      );
+      return;
+    }
+
+    const passPower = cfg.PASS_POWER_BASE * multiplier;
+    let lift = 0.5 * multiplier;
+    let leadScale = 1;
+    let powerScale = 1;
+
+    if (action === 'through_pass') {
+      lift = 1.2 * multiplier;
+      leadScale = 1.35;
+      direction.add(this.vel.clone().mul(0.08 * multiplier));
+      direction.normalize();
+    } else if (action === 'lob_pass') {
+      lift = 5.5 * multiplier;
+      powerScale = 0.9;
+    } else if (action === 'driven_pass') {
+      lift = 0.15 * multiplier;
+      powerScale = 1.35;
+    } else if (action === 'long_pass') {
+      lift = 4 * multiplier;
+      powerScale = 1.15;
+    } else {
+      powerScale = 0.85 + multiplier * 0.2;
+    }
+
+    ball.kick(new Vec3(
+      direction.x * passPower * powerScale * leadScale,
+      direction.y * passPower * powerScale * leadScale,
+      lift,
+    ));
   }
 
   private idealBallPosition(touch: string) {

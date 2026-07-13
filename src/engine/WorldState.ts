@@ -1,6 +1,7 @@
 import { Vec2, Vec3 } from './Math';
 import { BallControlState } from './Player';
 import { OpponentState } from './Opponent';
+import { PassModifier, ShotModifier } from './Intent';
 
 export interface PlayerState {
   pos: Vec2;
@@ -10,6 +11,8 @@ export interface PlayerState {
   isCharging: boolean;
   chargeStart: number;
   chargeType: 'pass' | 'shoot';
+  passModifier: PassModifier;
+  shotModifier: ShotModifier;
 }
 
 export interface BallState {
@@ -52,6 +55,8 @@ export function createEmptyWorldState(): WorldState {
       isCharging: false,
       chargeStart: 0,
       chargeType: 'pass',
+      passModifier: 'none',
+      shotModifier: 'none',
     },
     ball: {
       pos: new Vec3(0, 0, 0),
@@ -85,6 +90,8 @@ export function cloneWorldState(state: WorldState): WorldState {
       isCharging: state.player.isCharging,
       chargeStart: state.player.chargeStart,
       chargeType: state.player.chargeType,
+      passModifier: state.player.passModifier,
+      shotModifier: state.player.shotModifier,
     },
     ball: {
       pos: new Vec3(state.ball.pos.x, state.ball.pos.y, state.ball.pos.z),

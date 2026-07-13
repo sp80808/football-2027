@@ -16,6 +16,12 @@ export class InputSystem {
     shootPressed: false,
     shootHeld: false,
     shootReleased: false,
+    lobHeld: false,
+    finesseHeld: false,
+    chipHeld: false,
+    drivenHeld: false,
+    skillPressed: false,
+    lowDrivenTap: false,
     tacklePressed: false,
     slidePressed: false,
     switchPressed: false,
@@ -29,6 +35,13 @@ export class InputSystem {
   private prevTackle = false;
   private prevSlide = false;
   private prevSwitch = false;
+  private prevSkill = false;
+  private shootCharging = false;
+  private lowDrivenLatched = false;
+  private lastShootPressTime = 0;
+  private lastStickDir = new Vec2();
+  private lastStickTapTime = 0;
+  private touchOverrides: Partial<ControllerFrame> = {};
 
   init() {
     if (typeof window !== 'undefined') {
@@ -39,6 +52,11 @@ export class InputSystem {
         this.keys[event.code] = false;
       });
     }
+  }
+
+  /** Merge virtual touch input for mobile overlay. */
+  applyTouchOverrides(overrides: Partial<ControllerFrame> | null) {
+    this.touchOverrides = overrides ?? {};
   }
 
   update() {
@@ -58,10 +76,16 @@ export class InputSystem {
     let pass = false;
     let throughPass = false;
     let shoot = false;
+    let lob = false;
+    let finesse = false;
+    let chip = false;
+    let driven = false;
+    let skill = false;
     let tackle = false;
     let slide = false;
     let switchPlayer = false;
     let keeperRush = false;
+    let lowDrivenTap = false;
 
     if (gamepad) {
       if (Math.abs(gamepad.axes[0]) > 0.1) leftStick.x = gamepad.axes[0];
@@ -71,9 +95,26 @@ export class InputSystem {
       if (gamepad.buttons[7]?.pressed) sprint = gamepad.buttons[7].value;
       if (gamepad.buttons[6]?.pressed) shield = gamepad.buttons[6].value;
       pass = gamepad.buttons[0]?.pressed || false;
+      lob = gamepad.buttons[1]?.pressed || false;
       shoot = gamepad.buttons[2]?.pressed || false;
       throughPass = gamepad.buttons[3]?.pressed || false;
-      switchPlayer = gamepad.buttons[4]?.pressed || false;
+      chip = gamepad.buttons[4]?.pressed || false;
+      finesse = gamepad.buttons[5]?.pressed || false;
+      driven = gamepad.buttons[5]?.pressed || false;
+      if (shoot && !this.prevShoot && this.shootCharging) {
+        lowDrivenTap = true;
+        this.lowDrivenLatched = true;
+      }
+      if (shoot && !this.prevShoot) {
+        this.lastShootPressTime = performance.now();
+        this.shootCharging = true;
+      }
+      if (!shoot) {
+        this.shootCharging = false;
+        this.lowDrivenLatched = false;
+      }
+      const rsMag = rightStick.mag();
+      skill = rsMag > 0.85;
     } else {
       if (this.keys.ArrowUp || this.keys.KeyW) leftStick.y += 1;
       if (this.keys.ArrowDown || this.keys.KeyS) leftStick.y -= 1;
@@ -86,10 +127,55 @@ export class InputSystem {
       pass = !!(this.keys.KeyF || this.keys.Space);
       shoot = !!(this.keys.KeyG || this.keys.Enter);
       throughPass = !!this.keys.KeyR;
+      lob = !!this.keys.KeyE;
+      finesse = !!this.keys.KeyQ;
+      chip = !!(this.keys.AltLeft || this.keys.AltRight);
+      driven = !!(this.keys.ShiftLeft || this.keys.ShiftRight);
+      skill = !!this.keys.KeyC;
       tackle = !!this.keys.KeyT;
-      switchPlayer = !!this.keys.KeyQ;
-      keeperRush = !!this.keys.KeyE;
+      switchPlayer = !!this.keys.Tab;
+      keeperRush = false;
+
+      if (shoot && !this.prevShoot) {
+        if (this.shootCharging && performance.now() - this.lastShootPressTime < 350) {
+          lowDrivenTap = true;
+          this.lowDrivenLatched = true;
+        }
+        this.lastShootPressTime = performance.now();
+        this.shootCharging = true;
+      }
+      if (!shoot) {
+        this.shootCharging = false;
+      }
+      if (this.lowDrivenLatched) lowDrivenTap = true;
+      if (!shoot && this.prevShoot) this.lowDrivenLatched = false;
+
+      if (leftStick.magSq() > 0.5) {
+        const now = performance.now();
+        const sameDir = this.lastStickDir.dot(leftStick) > 0.85 && leftStick.magSq() > 0.5;
+        if (sameDir && now - this.lastStickTapTime < 280) {
+          skill = true;
+          this.lastStickTapTime = 0;
+        } else if (!sameDir || now - this.lastStickTapTime > 280) {
+          this.lastStickDir.copy(leftStick);
+          this.lastStickTapTime = now;
+        }
+      }
     }
+
+    const touch = this.touchOverrides;
+    if (touch.leftStick) leftStick.copy(touch.leftStick);
+    if (touch.rightStick) rightStick.copy(touch.rightStick);
+    if (touch.sprint !== undefined) sprint = touch.sprint;
+    if (touch.shield !== undefined) shield = touch.shield;
+    if (touch.passHeld) pass = true;
+    if (touch.shootHeld) shoot = true;
+    if (touch.throughPassHeld) throughPass = true;
+    if (touch.lobHeld) lob = true;
+    if (touch.finesseHeld) finesse = true;
+    if (touch.chipHeld) chip = true;
+    if (touch.drivenHeld) driven = true;
+    if (touch.skillPressed) skill = true;
 
     this.currentFrame.leftStick.copy(leftStick);
     this.currentFrame.rightStick.copy(rightStick);
@@ -104,6 +190,12 @@ export class InputSystem {
     this.currentFrame.shootPressed = shoot && !this.prevShoot;
     this.currentFrame.shootHeld = shoot;
     this.currentFrame.shootReleased = !shoot && this.prevShoot;
+    this.currentFrame.lobHeld = lob;
+    this.currentFrame.finesseHeld = finesse;
+    this.currentFrame.chipHeld = chip;
+    this.currentFrame.drivenHeld = driven;
+    this.currentFrame.skillPressed = skill && !this.prevSkill;
+    this.currentFrame.lowDrivenTap = lowDrivenTap;
     this.currentFrame.tacklePressed = tackle && !this.prevTackle;
     this.currentFrame.slidePressed = slide && !this.prevSlide;
     this.currentFrame.switchPressed = switchPlayer && !this.prevSwitch;
@@ -115,5 +207,6 @@ export class InputSystem {
     this.prevTackle = tackle;
     this.prevSlide = slide;
     this.prevSwitch = switchPlayer;
+    this.prevSkill = skill;
   }
 }
