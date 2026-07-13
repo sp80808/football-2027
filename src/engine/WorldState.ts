@@ -19,6 +19,7 @@ export interface BallState {
 export interface KeeperState {
   pos: Vec2;
   facing: Vec2;
+  aiState: 'positioning' | 'diving' | 'recovering';
 }
 
 export interface WorldState {
@@ -46,7 +47,8 @@ export function createEmptyWorldState(): WorldState {
     },
     keeper: {
       pos: new Vec2(0, 52),
-      facing: new Vec2(0, -1)
+      facing: new Vec2(0, -1),
+      aiState: 'positioning' as const
     }
   };
 }
@@ -69,7 +71,8 @@ export function cloneWorldState(state: WorldState): WorldState {
     },
     keeper: {
       pos: state.keeper.pos.clone(),
-      facing: state.keeper.facing.clone()
+      facing: state.keeper.facing.clone(),
+      aiState: state.keeper.aiState
     }
   };
 }
@@ -93,6 +96,7 @@ export function interpolateWorldState(prev: WorldState, next: WorldState, alpha:
   // Interpolate keeper
   result.keeper.pos.x = prev.keeper.pos.x + (next.keeper.pos.x - prev.keeper.pos.x) * alpha;
   result.keeper.pos.y = prev.keeper.pos.y + (next.keeper.pos.y - prev.keeper.pos.y) * alpha;
+  result.keeper.aiState = next.keeper.aiState; // discrete — take next value
 
   return result;
 }

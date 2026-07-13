@@ -103,6 +103,7 @@ export class GameEngine {
 
     state.keeper.pos.copy(this.keeper.pos);
     state.keeper.facing.copy(this.keeper.facing);
+    state.keeper.aiState = this.keeper.aiState;
   }
 
   private enforceBoundaries() {
