@@ -27,6 +27,7 @@
     "react-dom": "^19.0.1",
     "three": "^0.185.1",
     "vite": "^6.2.3",
+    "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
