@@ -1,6 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/Button';
+import { GlassPanel } from './ui/GlassPanel';
+import { ACCENT, TYPO, iconProps } from '../ui/designTokens';
 import { useGameStore } from '../store/gameStore';
 import { RotateCcw, Home } from 'lucide-react';
 import { fadeUp, motionTransition, springSmooth, useReducedMotion } from '../ui/motionPresets';
@@ -47,16 +49,16 @@ export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayPr
             initial={reduced ? false : { scale: 0.92, y: 16 }}
             animate={{ scale: 1, y: 0 }}
             transition={motionTransition(reduced, springSmooth)}
-            className="flex min-w-[min(420px,92vw)] flex-col items-center gap-6 rounded-2xl border border-white/15 bg-slate-950/90 px-8 py-10 text-center shadow-2xl backdrop-blur-md"
+            className="flex min-w-[min(420px,92vw)] flex-col items-center gap-6 text-center"
           >
-            <p className="m-0 text-xs font-semibold uppercase tracking-[0.35em] text-amber-300">Full Time</p>
-            <p className="m-0 text-sm font-semibold uppercase tracking-[0.25em] text-white/45">
+            <p className="m-0 text-xs font-semibold uppercase tracking-[0.35em] text-accent-warning">Full Time</p>
+            <p className="m-0 text-sm font-semibold uppercase tracking-[0.25em] text-text-muted">
               {resultLabel(homeScore, awayScore)}
             </p>
             <div className="flex items-center gap-6">
-              <span className="font-mono text-5xl font-black tabular-nums text-emerald-300">{homeScore}</span>
-              <span className="text-2xl font-light text-white/30">—</span>
-              <span className="font-mono text-5xl font-black tabular-nums text-red-300">{awayScore}</span>
+              <span className="font-score text-5xl font-black tabular-nums text-accent-player">{homeScore}</span>
+              <span className="text-2xl font-light text-text-subtle">—</span>
+              <span className="font-score text-5xl font-black tabular-nums text-accent-opponent">{awayScore}</span>
             </div>
             <p className="m-0 max-w-sm text-sm text-white/60">
               {homeScore === awayScore
@@ -76,12 +78,12 @@ export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayPr
             >
               <motion.div variants={reduced ? undefined : fadeUp}>
                 <Button size="lg" onClick={onRematch}>
-                  <RotateCcw size={18} /> Rematch
+                  <RotateCcw {...iconProps('sm')} /> Rematch
                 </Button>
               </motion.div>
               <motion.div variants={reduced ? undefined : fadeUp}>
                 <Button variant="secondary" size="lg" onClick={onMainMenu}>
-                  <Home size={18} /> Main Menu
+                  <Home {...iconProps('sm')} /> Main Menu
                 </Button>
               </motion.div>
             </motion.div>
@@ -91,16 +93,16 @@ export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayPr
             initial={reduced ? false : { scale: 0.9, y: 12 }}
             animate={{ scale: 1, y: 0 }}
             transition={motionTransition(reduced, springSmooth)}
-            className="flex min-w-[min(320px,88vw)] flex-col items-center gap-4 rounded-2xl border border-white/15 bg-slate-950/85 px-8 py-9 text-center shadow-2xl backdrop-blur-md"
+            className="flex min-w-[min(320px,88vw)] flex-col items-center gap-4 text-center"
           >
-            <p className="m-0 text-xs font-semibold uppercase tracking-[0.35em] text-white/50">
+            <p className="m-0 text-xs font-semibold uppercase tracking-[0.35em] text-text-muted">
               {pauseTitle}
             </p>
             {showHalftime && (
               <div className="flex items-center gap-4 font-mono text-3xl font-black tabular-nums">
-                <span className="text-emerald-300">{homeScore}</span>
-                <span className="text-white/25">|</span>
-                <span className="text-red-300">{awayScore}</span>
+                <span className="text-accent-player">{homeScore}</span>
+                <span className="text-text-subtle">|</span>
+                <span className="text-accent-opponent">{awayScore}</span>
               </div>
             )}
             {periodCountdown !== null && periodCountdown > 0 && (
@@ -109,12 +111,12 @@ export function MatchPhaseOverlay({ onRematch, onMainMenu }: MatchPhaseOverlayPr
                 initial={reduced ? false : { scale: 1.4, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={motionTransition(reduced, springSmooth)}
-                className="font-mono text-6xl font-black tabular-nums text-white"
+                className="font-score text-6xl font-black tabular-nums text-white"
               >
                 {periodCountdown}
               </motion.span>
             )}
-            <p className="m-0 text-sm text-white/55">
+            <p className="m-0 text-sm text-text-secondary">
               {showHalftime ? 'Teams returning to the pitch…' : 'Get ready…'}
             </p>
           </motion.div>
