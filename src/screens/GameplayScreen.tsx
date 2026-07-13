@@ -27,7 +27,6 @@ interface GameplayScreenProps {
 
 export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
   const [useWasm, setUseWasm] = useState(false);
-  const [, setForceRender] = useState({});
   const [replayMode, setReplayMode] = useState(false);
   const replayModeRef = useRef(false);
   const [replayFrame, setReplayFrame] = useState(0);
@@ -95,7 +94,6 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ onExit }) => {
         useGameStore.getState().prunePlayEvents();
       }
       wasmClient.submitInput(tsEngine.input.currentFrame);
-      if (Math.random() < 0.1) setForceRender({});
     };
     requestId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(requestId);

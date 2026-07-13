@@ -1,209 +1,181 @@
-# Development Roadmap
+# Football 2027 Roadmap & Development Sprints
 
-## Overview
-30-week phased development plan transforming the 1v1 prototype into a full football simulation with realistic physics, complete FIFA rules, tactical AI, broadcast-quality graphics, and real English football data.
+This document outlines the development phases, technical roadmaps, and detailed sprint schedules for **Football 2027**.
 
----
-
-## Phase 1: Core Physics & Simulation (Weeks 1-6)
-**Goal**: Production-ready physics foundation with enhanced realism
-
-### Week 1-2: Enhanced Ball Physics
-- [x] Magnus effect (spin-induced curve)
-- [x] Variable air density (altitude, temperature, humidity)
-- [x] Ball deformation on high-velocity impact
-- [x] Surface-dependent friction (wet/dry, grass length)
-- [x] Spin decay (air + ground)
-- [x] Spin generation from tangential friction on bounce
-
-### Week 2-3: Advanced Player Locomotion
-- [ ] Momentum-based turning (angular inertia)
-- [ ] Non-linear acceleration/deceleration curves
-- [ ] Player-to-player collision resolution
-- [ ] Stamina/fatigue system affecting performance
-- [ ] Body lean animation sync with velocity
-- [ ] Tackle/shoulder charge physics
-
-### Week 3-4: Ball-Player Interaction
-- [ ] First-touch quality based on attributes
-- [ ] Body-part trapping (chest, thigh, foot)
-- [ ] Shielding with body positioning
-- [ ] Headers with jump timing and power
-- [ ] Volley/half-volley detection and physics
-
-### Week 4-6: FIFA Laws of the Game
-- [ ] **Offside** - Real-time detection with active play logic
-- [ ] **Throw-ins** - Correct procedure, foul throws
-- [ ] **Goal Kicks** - New rule (ball in play when kicked)
-- [ ] **Corner Kicks** - Placement, defenders distance
-- [ ] **Free Kicks** - Direct/indirect, wall distance, quick free kicks
-- [ ] **Penalties** - Stutter run, keeper movement, encroachment
-- [ ] **Yellow/Red Cards** - Persistent infringement, DOGSO, SPA
-- [ ] **Advantage Rule** - Play on when beneficial
-- [ ] **Substitutions** - 5 subs, 3 windows + half-time
-- [ ] **VAR Review** - Goal, penalty, red card, mistaken identity
-
-**Deliverable**: Complete 1v1 simulation with all FIFA restarts and offside
+> For the comprehensive 30-week phased plan (physics, AI, graphics, data integration), see [DEVELOPMENT_ROADMAP.md](./DEVELOPMENT_ROADMAP.md).
 
 ---
 
-## Phase 2: Tactical AI & Team Play (Weeks 7-12)
-**Goal**: 11v11 with coherent team tactics and intelligent decision-making
+## Roadmap Overview
 
-### Week 7-9: Tactical Framework
-- [ ] `TacticalProfile` system (formation, mentality, pressing, width, tempo)
-- [ ] Role-based controllers (GK, CB, FB, CDM, CM, CAM, W, ST)
-- [ ] Utility-based decision engine
-- [ ] Team coordination (cover, overlap, third-man runs)
-
-### Week 9-10: Advanced Goalkeeper
-- [ ] Sweeper keeper behavior
-- [ ] Shot probability heatmaps for positioning
-- [ ] Cross claiming and punching
-- [ ] Distribution decision tree (throw/kick/roll)
-- [ ] Penalty mind games
-
-### Week 10-11: Set Piece AI
-- [ ] Corner routines (near/far/short/edge)
-- [ ] Free kick routines (direct/cross/dummy/layoff)
-- [ ] Penalty routines (placement/power/stutter)
-- [ ] Throw-in routines (long/short/flip)
-- [ ] Defensive assignments (man/zone/man+zone)
-
-### Week 11-12: Team Coordination
-- [ ] Overlapping/underlapping runs
-- [ ] Third-man runs
-- [ ] False nine dropping deep
-- [ ] Inverted winger cuts
-- [ ] Defensive cover rotations
-- [ ] Pressing traps
-- [ ] Counter-attack triggers
-
-**Deliverable**: 11v11 match with tactical variety and realistic team play
+```mermaid
+gantt
+    title Football 2027 Development Timeline
+    dateFormat  YYYY-MM
+    section Phase 1: Foundation
+    Completed Core Architecture :done, 2026-06, 2026-07
+    section Phase 2: Expressive Control
+    Sprint 2.1: Input Intent Parser :active, 2026-07, 2026-08
+    Sprint 2.2: Advanced First Touch :active, 2026-08, 2026-08
+    Sprint 2.3: Player Shielding : 2026-08, 2026-09
+    Sprint 2.4: Contextual Targeting : 2026-09, 2026-09
+    section Phase 3: Defensive & AI
+    Sprint 3.1: Tackle Mechanics & Windows : 2026-09, 2026-10
+    Sprint 3.2: Defending Jockey & Pressing : 2026-10, 2026-10
+    Sprint 3.3: Advanced Goalkeeper AI : 2026-10, 2026-11
+    Sprint 3.4: Team Tactics & Policies : 2026-11, 2026-11
+    section Phase 4: Multiplayer & Scale
+    Sprint 4.1: Spatial Collision Hashing : 2026-11, 2026-12
+    Sprint 4.2: 11v11 Simulation & Shapes : 2026-12, 2027-01
+    Sprint 4.3: Couch Multiplayer : 2027-01, 2027-01
+    section Phase 5: Career Mode
+    Sprint 5.1: SQLite/IndexedDB & State : 2027-01, 2027-02
+    Sprint 5.2: Zod Schemas & Career Data : 2027-02, 2027-02
+    Sprint 5.3: Gemini-powered AI Scouting : 2027-02, 2027-03
+```
 
 ---
 
-## Phase 3: Graphics & Immersion (Weeks 13-18)
-**Goal**: Broadcast-quality visuals with dynamic environments
-
-### Week 13-14: Advanced Pitch
-- [ ] Geometry shader grass with wind simulation
-- [ ] Dynamic pitch wear (high-traffic degradation)
-- [ ] Dynamic line marking (fade, chalk dust)
-- [ ] Weather: rain puddles, snow, frost
-- [ ] Time-of-day lighting (dynamic shadows)
-- [ ] Stadium floodlight system
-
-### Week 14-15: Player Rendering
-- [ ] Skeletal animation (glTF models)
-- [ ] Animation blend trees (locomotion/turn/kick/fall)
-- [ ] Cloth simulation (shorts, sleeves, hair)
-- [ ] Muscle deformation (corrective blend shapes)
-- [ ] Facial animation (blend shapes)
-- [ ] Kit physics (dynamic fabric)
-
-### Week 15: Ball Visual Effects
-- [ ] Spin visualization (subtle trail)
-- [ ] Impact particles (dust, grass, water)
-- [ ] Heat distortion on powerful shots
-- [ ] Wet ball sheen
-- [ ] Scuff mark accumulation
-
-### Week 16-17: Stadium & Environment
-- [ ] Modular stadium system (stands, roof, floodlights)
-- [ ] Dynamic crowd (impostors, waves, flares, tifos)
-- [ ] Animated advertising boards
-- [ ] Integrated scoreboard
-- [ ] TV broadcast camera angles
-- [ ] VAR screen overlay
-
-### Week 17-18: Post-Processing Pipeline
-- [ ] ACES tone mapping + bloom
-- [ ] Motion blur (camera + object)
-- [ ] Depth of field (cinematic)
-- [ ] Lens flare, chromatic aberration
-- [ ] Film grain, vignette
-- [ ] HDR output support
-
-**Deliverable**: Broadcast-quality match presentation
+## Phase 1: Foundation (Completed)
+* **Code Audit**: Audited existing React, Three.js, and physics structures.
+* **Fixed Timestep**: Implemented double-buffered 120 Hz tick loop with accumulator-based render interpolation.
+* **Input Buffering**: Added basic controller abstraction and mapped gamepad/keyboard input frames.
+* **Diagnostic HUD**: Created a visual overlay displaying FPS, TPS, player speeds, and control states.
+* **Vitest Coverage**: Established test suite for goals and ball logic.
 
 ---
 
-## Phase 4: Real-World Data Integration (Weeks 19-26)
-**Goal**: Authentic English football experience with real data
+## Phase 2: Expressive Control (Current Phase)
 
-### Week 19-21: Data Pipeline
-- [ ] football-data.co.uk (all English leagues) ingestion
-- [ ] FBref/StatsBomb advanced metrics (xG, progressive, pressures)
-- [ ] Transfermarkt values, contracts, transfers
-- [ ] Football-Data.org live scores/fixtures
-- [ ] OpenStreetMap stadium locations
-- [ ] Automated ETL pipeline with validation
+Phase 2 focuses on moving from simple direct physics to **intentional control**. The engine will parse raw inputs into a semantic `PlayerIntent` before executing movements and touches.
 
-### Week 21-22: Attribute Calculation
-- [ ] Statistical mapping to 1-20 attributes
-- [ ] Position-specific weighting
-- [ ] Age curve modeling (development → peak → decline)
-- [ ] Form fluctuations
-- [ ] Injury history impact
+### Sprint 2.1: Input Intent Parser
+* **Objective**: Decouple raw `ControllerFrame` inputs from physics execution by building the `IntentParser`.
+* **Deliverables**:
+  * Implement `IntentParser.ts` inside `src/engine/`.
+  * Parse raw buttons/sticks into semantic action triggers (e.g., distinguishing between a tap for a short pass vs holding for a through pass, or pressing the trigger for a knock-on).
+  * Update `Player.update()` to accept `PlayerIntent` rather than `ControllerFrame`.
+* **Files Affected**:
+  * [NEW] `src/engine/IntentParser.ts`
+  * [MODIFY] [Intent.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Intent.ts)
+  * [MODIFY] [Player.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Player.ts)
+  * [MODIFY] [GameEngine.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/GameEngine.ts)
+* **Acceptance Criteria**:
+  * All unit tests build successfully.
+  * Diagnostic HUD displays parsed intent coordinates correctly.
+  * Movement remains responsive with zero latency introduced by the parsing layer.
 
-### Week 22-23: League Structure
-- [ ] Full English pyramid (PL → National League N/S)
-- [ ] Promotion/relegation playoffs
-- [ ] Cup competitions (FA Cup, EFL Cup, EFL Trophy, FA Trophy)
-- [ ] European qualification (CL, EL, ECL)
-- [ ] Fixture scheduling algorithm
-- [ ] TV revenue distribution
+### Sprint 2.2: Advanced First Touch Logic
+* **Objective**: Replace instant-snapping ball possession with a realistic touch-cadence system.
+* **Deliverables**:
+  * Implement touch mechanics based on the speed of the incoming ball relative to the player.
+  * Add support for 4 touch profiles:
+    * `cushion`: Soft touch that kills the ball's momentum (active when moving slowly or shielding).
+    * `push`: Standard dribble touch that pushes the ball slightly ahead.
+    * `knock_on`: Heavy touch pushing the ball far ahead into space (triggered by sprinting + flicking direction).
+    * `first_time`: Deflecting or passing the ball directly before gaining control.
+* **Files Affected**:
+  * [MODIFY] [Player.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Player.ts)
+  * [MODIFY] [Ball.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Ball.ts)
+* **Acceptance Criteria**:
+  * Incoming high-speed balls bounce off players naturally if they don't perform a "cushion" touch.
+  * Sprinting causes the touch interval to increase, making the ball loose and interceptable between touches.
 
-### Week 23-25: Career Mode
-- [ ] CareerManager (save/load, progression)
-- [ ] TransferMarket (AI clubs, negotiations, contracts)
-- [ ] ScoutingSystem (fog of war, scout reports)
-- [ ] TrainingSystem (sessions, development plans)
-- [ ] StaffManager (coaches, scouts, medical, analysts)
-- [ ] BoardObjectives (expectations, job security)
-- [ ] NewsGenerator (dynamic narratives)
+### Sprint 2.3: Player Shielding & Bracing
+* **Objective**: Allow the player to shield the ball using their physical body to block incoming opponents.
+* **Deliverables**:
+  * Implement shielding mechanics inside `Player.ts` when holding the shield input button.
+  * Rotate the player's back toward the nearest opponent, pinning the ball between the player's legs and the opponent's feet.
+  * Apply friction/tackle resistance modifiers to make it harder to dispossess a shielding player.
+* **Files Affected**:
+  * [MODIFY] [Player.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Player.ts)
+  * [MODIFY] [Opponent.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Opponent.ts)
+* **Acceptance Criteria**:
+  * The opponent cannot execute standing tackles from behind while the player is in the `shielding` state.
+  * Player speed is heavily penalized while shielding (e.g., maximum 30% of normal jogging speed).
 
-### Week 25-26: AI Scouting & Analysis
-- [ ] Scout reports (attribute ranges, fog of war)
-- [ ] Match reports (tactical analysis)
-- [ ] Opposition instructions
-- [ ] Player comparison tools
-- [ ] Development predictions
+### Sprint 2.4: Contextual Target Selection
+* **Objective**: Add joystick-guided targeting for passing and shooting instead of kicking blindly in the player's facing direction.
+* **Deliverables**:
+  * Scan potential pass targets (other players/open spaces) within a cone extending in the direction of the left stick.
+  * Highlight the target visually.
+  * Apply smart targeting to shots, snapping the kick vector toward the corners of the goal when charging a shot near the penalty box.
+* **Files Affected**:
+  * [MODIFY] [Player.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Player.ts)
+  * [MODIFY] [GameEngine.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/GameEngine.ts)
+  * [NEW] `src/engine/TargetFinder.ts`
+* **Acceptance Criteria**:
+  * Kicking passes with short taps snaps the ball's direction toward a target teammate within a $30^\circ$ cone.
+  * Charging a shot near the goal box automatically biases the ball vector to the left or right post based on the stick direction.
 
-**Deliverable**: Full career mode with real English football data
+---
+
+## Phase 3: Defensive & AI Mechanics
+
+Phase 3 introduces physics-based defensive interactions and advances opponent AI behaviors.
+
+### Sprint 3.1: Standing & Sliding Tackle Windows
+* **Objective**: Implement active tackling animations and physics-based dispossession windows.
+* **Deliverables**:
+  * Add standing tackle lunge that extends the player's possession collection radius forward.
+  * Add sliding tackle physics where the player slides as a physical capsule along the pitch floor, blocking paths and sweeping the ball.
+  * Enforce cooldowns and inertia penalties on missed tackles.
+* **Files Affected**:
+  * [MODIFY] [Player.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Player.ts)
+  * [MODIFY] [Ball.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Ball.ts)
+  * [MODIFY] [Opponent.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Opponent.ts)
+* **Acceptance Criteria**:
+  * Sliding tackles sweep the ball correctly but lock the player into a 1.5s recovery state.
+  * Staged tackles from behind trigger foul checks (in later phases).
+
+### Sprint 3.2: Defending Jockey & Pressing
+* **Objective**: Improve opponent AI defensive positioning to intelligently contain the ball carrier.
+* **Deliverables**:
+  * Upgrade `Opponent.ts` with dynamic jockeying offsets that shadow the ball carrier.
+  * Introduce pressure thresholds: AI sprints to press if the player takes a heavy touch (knock_on) or loses momentum.
+* **Files Affected**:
+  * [MODIFY] [Opponent.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Opponent.ts)
+* **Acceptance Criteria**:
+  * The opponent AI blocks passing lanes instead of running directly at the player.
+  * The opponent AI actively lunges for a tackle only when in range ($<1.2\text{m}$) and the ball is vulnerable.
+
+### Sprint 3.3: Advanced Goalkeeper AI
+* **Objective**: Replace simple goal-line strafing with diving, parrying, and goalkeeper rush mechanics.
+* **Deliverables**:
+  * Add a ball trajectory prediction system inside `Keeper.ts`.
+  * Calculate dive interception vectors.
+  * Implement "GK Rush" where the keeper charges out to clear loose balls when the player inputs the rush command.
+* **Files Affected**:
+  * [MODIFY] [Keeper.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/Keeper.ts)
+  * [MODIFY] [GameEngine.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/GameEngine.ts)
+* **Acceptance Criteria**:
+  * Goalkeepers dive horizontally to parry high-speed shots heading for the corners.
+  * Pressing the GK Rush button successfully causes the goalie to sprint toward the ball.
+
+### Sprint 3.4: Team Tactics & Policies
+* **Objective**: Integrate a lightweight configuration system to govern team-wide positioning.
+* **Deliverables**:
+  * Create `TacticalPolicy.ts` that coordinates defense/midfield/attack offsets.
+  * Implement base support for off-ball positioning guides.
+* **Files Affected**:
+  * [NEW] `src/engine/TacticalPolicy.ts`
+  * [MODIFY] [GameEngine.ts](file:///Volumes/Harry/DEV/F2027/football-2027/src/engine/GameEngine.ts)
+* **Acceptance Criteria**:
+  * Team lines shift up and down the pitch dynamically depending on the ball's position.
 
 ---
 
-## Phase 5: Technical Excellence (Weeks 27-30)
-**Goal**: Production-ready, performant, maintainable codebase
-
-### Week 27-28: Testing & CI/CD
-- [ ] Unit tests >90% coverage (Vitest)
-- [ ] Integration tests (all major systems)
-- [ ] Physics regression suite (deterministic seeds)
-- [ ] Visual regression (Playwright + Chromatic)
-- [ ] Performance benchmarks (CI gates)
-- [ ] GitHub Actions pipeline
-
-### Week 28-29: Performance Optimization
-- [ ] Object pooling (zero per-tick allocation)
-- [ ] Spatial hashing (collision broadphase)
-- [ ] Instanced rendering (players, crowd)
-- [ ] WASM physics hot path
-- [ ] Web Workers for AI
-- [ ] Bundle splitting (<1.5MB initial)
-
-### Week 29-30: WASM Migration
-- [ ] Port Ball, Player, Opponent, Keeper to Rust
-- [ ] Fixed-point deterministic math
-- [ ] SharedArrayBuffer zero-copy state
-- [ ] Web Worker isolation
-- [ ] TS fallback for unsupported browsers
-
-**Deliverable**: Production-ready, shippable product
+## Phase 4: Multiplayer, Scaling & Optimization
+* **Sprint 4.1**: Spatial Hashing for Collisions.
+* **Sprint 4.2**: 11v11 Simulation & Off-ball runs.
+* **Sprint 4.3**: Local Couch Multiplayer mapping.
 
 ---
+
+## Phase 5: Career Mode, Scouting & Persistence
+* **Sprint 5.1**: Career Mode Zod Schemas for Clubs, Players, and Competitions.
+* **Sprint 5.2**: SQLite/IndexedDB database persistence.
+* **Sprint 5.3**: Gemini-powered AI Match Scouting and Event Generation.
 
 ## Parallel Tracks (Continuous)
 
