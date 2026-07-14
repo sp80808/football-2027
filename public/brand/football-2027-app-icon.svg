@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Football 2027 app icon</title>
+  <desc id="desc">The Forward Pitch mark on a night navy rounded square.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0E1B2B"/>
+      <stop offset="1" stop-color="#07101C"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M56 420 456 92" stroke="#304058" stroke-width="18" opacity=".45"/>
+  <g transform="translate(77 77) scale(1.4)">
+    <path fill="#14D1E6" d="M28 28h162l-20 40H84v38h72l-19 38H84v84H28z"/>
+    <path fill="#33D677" d="M145 228 228 28h-49L96 228z"/>
+    <circle cx="151" cy="112" r="14" fill="#07101C" stroke="#F2F7FF" stroke-width="5"/>
+  </g>
+</svg>
