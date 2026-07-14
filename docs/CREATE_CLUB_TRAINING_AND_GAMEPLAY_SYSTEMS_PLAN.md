@@ -1,533 +1,350 @@
 # Football 2027 — Create-a-Club, Training Academy & Gameplay Systems Plan
 
-Status: planning proposal
+Status: implementation planning
 Date: 14 July 2026
 
 ## Product goal
 
-Create an enjoyable opening loop in which the player founds a club, designs its identity, creates a manager and optional player avatar, completes short skill games, then carries those choices into the deterministic career and match engine.
+Create one connected opening loop:
 
-The feature must not become a disconnected customisation screen. Club identity, staff profile, player attributes, training results, tactics, fixtures and live gameplay should share authoritative schemas and progression events.
+`create club → create manager/player → learn the match controls → play first fixture → receive progression`
 
-## 1. Create-a-Club flow
+Customisation, training and live matches must share authoritative schemas, semantic actions, assistance options, ball physics, event scoring and save data.
 
-Target completion time: 5–8 minutes, resumable at every step.
+## 1. Create-a-Club
 
-1. Club foundation
-2. Name, short name and commentary nickname
-3. Home location and local identity
-4. Colours and kit designer
-5. Crest designer
-6. Stadium/ground starting profile
-7. Club culture and football philosophy
-8. Manager creation
-9. Optional founding player creation
-10. Review, accessibility check and confirmation
+Target: complete with defaults in under five minutes; autosave every step.
 
-### Foundation archetypes
+1. club foundation and location
+2. name, short name, code and nickname
+3. colours and kits
+4. crest
+5. starting ground profile
+6. club culture and football philosophy
+7. manager
+8. optional founding player
+9. review and accessibility validation
 
-Each archetype changes starting constraints rather than providing a flat cosmetic choice.
+### Authoritative output
 
-- Community club: stronger supporter growth, lower initial budget.
-- Academy project: younger squad and development bonuses, lower physical readiness.
-- Works club: physical squad, loyal local following, basic facilities.
-- Technical collective: stronger control/passing baseline, shallow squad depth.
-- Phoenix club: stronger reputation and pressure, unstable finances.
-
-All bonuses must be bounded and visible before confirmation.
+- `ClubDefinition`
+- `ClubVisualIdentity`
+- `ManagerProfile`
+- `PlayerProfile`
+- `SquadRegistration`
+- `ClubSeasonState`
+- `MatchTeamSheet`
 
 ## 2. Kit designer
 
-### Interaction principles
+Use procedural recipes rather than baked texture collections.
 
-- Immediate 3D or clean 2D preview.
-- Controller-first: left stick changes focus/value, A confirms, B backs out, shoulder buttons change categories.
-- Mouse: click a region or preset, drag sliders, click colour chips.
-- Never require precise freehand drawing.
-- Randomise and undo buttons.
-- Home, away and goalkeeper kits generated from one workflow.
-- Real-time contrast and colour-blind warnings.
-
-### Preset pattern system
-
-Use procedural vector masks rather than storing hundreds of textures.
-
-Initial pattern families:
+Launch patterns:
 
 - solid
-- vertical stripes: 2, 3, 5, 7
+- vertical stripes
 - hoops
 - halves
 - quarters
-- sash left/right
+- sash
 - chest band
 - pinstripes
-- sleeves contrast
+- contrast sleeves
 - shoulder panel
 - centre stripe
-- gradient/fade
-- geometric chevrons
-- subtle tonal pattern
+- chevrons
+- tonal geometry
 
-Pattern schema:
+Store pattern, colours, collar, sleeves, shorts, socks and number style as parameters. Render SVG/menu previews and gameplay materials from the same recipe.
 
-```ts
-interface KitPatternDefinition {
-  id: string;
-  family: string;
-  maskParameters: Record<string, number | boolean>;
-  colourSlots: Array<'primary' | 'secondary' | 'accent' | 'trim'>;
-  supportsSleeveOverride: boolean;
-  supportsShortsOverride: boolean;
-  supportsSocksOverride: boolean;
-}
-```
+Use OKLab/Delta-E for perceptual home/away/goalkeeper separation and WCAG-style luminance checks for names and numbers. Automatically offer a clash-safe alternative.
 
-### Colour system
+## 3. Crest creator
 
-- Curated palettes first, advanced picker second.
-- Primary, secondary, accent and trim slots.
-- Calculate WCAG-like luminance contrast for UI previews and perceptual kit separation.
-- Away-kit validator compares home/away colour distance using OKLab/Delta E rather than RGB distance.
-- Automatically propose a clash-safe away kit and goalkeeper colour.
+Use a constrained deterministic SVG recipe:
 
-### Number, name and trim
+1. base shape
+2. border
+3. field colours
+4. divider/pattern
+5. original symbol or monogram
+6. optional text/year
+7. ornament
 
-- 4–6 original typeface styles with clear licence provenance.
-- Back name on/off.
-- Number style, outline and shadow presets.
-- Collar and cuff trim presets.
-- Sponsor area remains fictional/generic unless a later licensed system is added.
+No real-club templates, copied marks or unverified uploaded artwork in the first release.
 
-### Technical output
+## 4. Manager and optional founding player
 
-Store only parameters and render assets at runtime/build time:
+Keep appearance creation simple: face, skin tone, hair, facial hair, build, outfit and colour presets.
+
+Manager and player attributes use a bounded point budget determined by career difficulty and starting competition level. Creation choices should change tendencies, development and role fit without overpowering match skill.
+
+## 5. One semantic control system
+
+Training drills must not define physical buttons directly. They consume semantic football actions:
 
 ```ts
-interface ClubKit {
-  id: string;
-  type: 'home' | 'away' | 'goalkeeper';
-  patternId: string;
-  colours: { primary: string; secondary: string; accent: string; trim: string };
-  collarId: string;
-  sleeveId: string;
-  numberStyleId: string;
-  shortsPatternId?: string;
-  socksPatternId?: string;
-}
+export type FootballAction =
+  | 'move'
+  | 'sprint'
+  | 'shield_or_matchup'
+  | 'short_pass'
+  | 'through_pass'
+  | 'lofted_pass_or_cross'
+  | 'shoot'
+  | 'modifier_1'
+  | 'modifier_2'
+  | 'player_switch'
+  | 'right_stick_select_or_skill'
+  | 'standing_tackle_or_shouldering'
+  | 'sliding_tackle';
 ```
 
-## 3. Crest creation
+### FC-style Classic preset
 
-Use a layered, constrained editor that is fun on controller and avoids trademark-copying workflows.
+Face-button positions:
 
-### Crest layers
+- south: short pass / contain
+- north: through pass
+- east: shoot / standing tackle
+- west: cross or lofted pass / sliding tackle
 
-1. Shield/base shape
-2. Border style
-3. Primary/secondary fill
-4. Divider or pattern
-5. Central original symbol
-6. Optional top/bottom text
-7. Founding year
-8. Accent ornament
+Shoulders/triggers:
 
-### Launch shapes
+- right trigger: sprint
+- left trigger: shield or jockey
+- left shoulder: player switch; contextual run/chip modifier
+- right shoulder: teammate press; contextual finesse/driven modifier
 
-- shield
-- roundel
-- diamond
-- pennant
-- hexagon
-- modern angular mark
-- monogram tile
+### eFootball-style preset
 
-### Symbol library
+Face-button positions:
 
-Create original generic symbols only:
+- south: low pass / pressure
+- north: through pass
+- east: lofted pass or cross / sliding tackle
+- west: shoot / shoulder charge
 
-- local landscape: hill, river, bridge, coast, tree
-- industry: cog, anvil, loom, rail
-- football culture: floodlight, stand, pennant, boot silhouette
-- animals rendered as original minimal geometry
-- initials and geometric monograms
+Shoulders/triggers:
 
-Disallow direct upload at first. Later uploads require moderation and a clear rights declaration.
+- right trigger: dash
+- left trigger: match-up
+- left shoulder: cursor/player change
+- right shoulder: special-control or pressure modifier by context
 
-### Crest renderer
+### Settings
 
-Persist a `CrestRecipe`; generate SVG deterministically. Use the same SVG recipe for menus, scorebug, kits and stadium signage.
+- FC-style, eFootball-style and custom presets
+- assisted, semi-assisted and manual targeting
+- contextual or manual switching
+- analog sprint on/off
+- vibration/haptic intensity
+- hold/toggle options
+- dead-zone and sensitivity controls
+- keyboard/mouse remapping
+- reduced-input accessibility preset
 
-## 4. Club details
+### Dynamic device and glyph detection
 
-Required:
+- listen for `gamepadconnected` and `gamepaddisconnected`
+- poll `navigator.getGamepads()` during active input
+- prefer `standard` mapped controllers
+- infer glyph family conservatively and permit manual override
+- use most-recent-input switching with debounce/hysteresis
+- preserve control preset independently from controller brand
+- show PlayStation, Xbox, Nintendo-style, generic, keyboard or mouse labels dynamically
+- never treat `Gamepad.id` as a stable player identity
 
-- full name, short name and three-letter code
-- nickname and commentary pronunciation fallback
-- town/region
-- founding year
-- club colours
-- ground name
-- rivalry seed
-- supporter profile
-- football philosophy
-- board expectation
-- difficulty preset
+## 6. Training Academy
 
-Optional later:
+Prioritise match-relevant drills that teach the same actions and assistance settings used in fixtures.
 
-- motto
-- walkout music category
-- mascot
-- social/media tone
-- supporter group names
+### Passing
 
-## 5. Manager creation
+- static and moving gates
+- receiver selection
+- through-ball space
+- ground, driven and lofted passes
+- rondo and pressure escape
 
-Keep character creation simple and readable at match-camera distance.
+Metrics: directional error, arrival time, completion probability, receiver orientation, interception risk and possession value.
 
-### Identity
+### Shooting
 
-- name
-- pronouns
-- age band
-- nationality/region
-- voice category or text-only mode
-
-### Appearance
-
-- 8–12 face presets
-- skin tone range
-- hair preset and colour
-- facial hair
-- glasses
-- body build presets
-- touchline outfit and colour
-
-Do not start with a full facial sculpt system.
-
-### Manager attributes
-
-Choose one background and two strengths. Difficulty determines the available point budget and maximum starting values.
-
-Attributes, 1–20:
-
-- coaching
-- tactical knowledge
-- motivation
-- player development
-- recruitment
-- discipline
-- media handling
-
-Example budgets:
-
-- Story/Easy: 72 points, max 16
-- Standard: 62 points, max 14
-- Hard: 54 points, max 12
-- Founder challenge: 48 points, max 11
-
-Manager attributes should create modest modifiers and unlock information, not override match skill.
-
-## 6. Optional founding player creation
-
-### Basic identity and appearance
-
-Reuse the manager appearance pipeline with football-specific body presets.
-
-### Position and archetype
-
-- goalkeeper
-- defender
-- midfielder
-- winger
-- striker
-
-Archetypes provide bounded stat shapes: organiser, ball winner, playmaker, runner, target, creator, finisher, sweeper keeper.
-
-### Attribute budget
-
-Difficulty controls the total and caps. No starting created player should exceed the intended league level.
-
-Recommended launch attributes:
-
-- pace
-- acceleration
-- stamina
-- strength
-- balance
-- first touch
-- passing
-- shooting
-- dribbling
-- tackling
-- positioning
-- composure
-
-Use derived detailed ratings internally where needed. Surface a compact set to avoid spreadsheet overload.
-
-## 7. Training Academy mini-games
-
-All drills should use the same engine inputs, ball physics, target selection and scoring events as matches. Avoid separate arcade physics unless a drill explicitly needs a constrained mode.
-
-### A. Keepy-uppy challenge
-
-Inspiration: one-button Messenger-style football loop, but more forgiving and compatible with gamepad/mouse.
-
-Controls:
-
-- Gamepad: left stick positions the player/contact direction; A taps the ball.
-- Mouse: move pointer for body/contact direction; left-click taps.
-- Touch later: drag position, tap to juggle.
-
-Core loop:
-
-- Ball falls toward a contact zone.
-- Press timing determines upward impulse and error.
-- Stick/pointer direction adds lateral correction.
-- Generous early timing window; narrows slowly with streak.
-- Missed perfect timing should usually produce a recoverable touch, not immediate failure.
-- Optional head/chest/foot contact prompts after the basic mode works.
-
-Scoring:
-
-```text
-score = touches
-      + perfectTimingBonus
-      + alternatingFootBonus
-      + recoveryBonus
-      + controlledHeightBonus
-```
-
-Difficulty changes target window and lateral instability, not arbitrary input lag.
-
-Modes:
-
-- first touch tutorial
-- 30-second score attack
-- survive as long as possible
-- target height sequence
-- weak-foot challenge
-
-Training effect: small first-touch, balance and composure XP; daily/weekly caps prevent grinding exploits.
-
-### B. Passing gates
-
-- Pass through moving or static gates.
-- Ground, driven and lofted variants.
-- Score arrival timing, direction error, receiver control and risk.
-- Introduce body orientation and pass availability gradually.
-
-### C. Rondo / keep-ball
-
-- 3v1 then 4v2.
-- Teaches scanning, quick passing, first touch and support angles.
-- Uses pitch-control and interception-time diagnostics.
-- Score possession streak, one-touch actions and line-breaking passes.
-
-### D. Shooting practice
-
-- Static finishing
-- moving ball finishing
+- static and moving-ball finishing
 - near/far-post targets
 - first-time shots
-- finesse/placed shots
+- placed/finesse variants
 - pressure finishing
-- penalties later
 
-Score expected difficulty, placement, timing and shot selection—not only raw target hits.
+Metrics: shot quality, placement, timing, body orientation and goalkeeper advantage.
 
-### E. Crossing and heading
+### Crossing
 
-- Cross into highlighted arrival zones.
-- Vary receiver runs and defensive pressure.
-- Score ball flight, arrival window and receiver advantage.
+- target zones
+- receiver runs
+- defensive pressure
+- near/far-post and cut-back choices
 
-### F. Dribbling course
+### Dribbling
 
-- Slalom with optional sprint gates.
-- Shield-and-turn section.
-- Dynamic defender shadows later.
-- Penalise excessive touches and loss of control rather than using rigid rail movement.
+- slalom
+- acceleration/deceleration
+- shielding and turns
+- controlled sprint changes
+- defender shadows
 
-### G. Defending drill
+### Defending
 
-- Jockey and contain
-- intercept passing lane
-- secondary press choice
-- timed standing tackle
-- recover after being bypassed
+- match-up/jockey
+- contextual switching
+- passing-lane interception
+- teammate pressure
+- standing and sliding tackles
+- recovery after being bypassed
 
-### H. Goalkeeper drills
+### Goalkeeping
 
-- positioning arcs
-- near-post protection
+- positioning
 - reaction saves
 - claiming crosses
+- rush/hold decisions
 - distribution targets
 
-## 8. Shared drill architecture
+A juggling activity may be added later, but it is not the MVP control reference and receives no bespoke physical-button scheme.
+
+## 7. Shared deterministic drill framework
 
 ```ts
 interface TrainingDrillDefinition {
   id: string;
-  category: 'control' | 'passing' | 'shooting' | 'dribbling' | 'defending' | 'goalkeeping';
+  category: 'passing' | 'shooting' | 'crossing' | 'dribbling' | 'defending' | 'goalkeeping';
   scenario: ScenarioDefinition;
-  inputProfile: string;
+  allowedActions: FootballAction[];
   scoreRules: ScoreRule[];
   medals: { bronze: number; silver: number; gold: number };
-  durationSeconds?: number;
   progressionRewards: TrainingReward[];
   tutorialSteps: TutorialStep[];
 }
 ```
 
-A drill runner should provide:
+Requirements:
 
-- deterministic seed
-- reset/retry under two seconds
-- ghost/best-run replay
-- bronze/silver/gold targets
-- adaptive tutorial hints
-- accessible speed and assistance options
-- per-action diagnostics
-- training reward caps
+- fixed seed and replayable semantic-input trace
+- restart in under two seconds
+- current-binding tutorial prompts
+- gamepad and keyboard/mouse parity
+- bronze/silver/gold thresholds
+- bounded progression rewards
+- diagnostics for selected action, timing, aim, assistance and outcome
+- no React or Three.js imports in authoritative drill logic
 
-## 9. Engine and gameplay audit additions
+## 8. Mathematical gameplay systems
 
-### Movement and contact
+### Arrival time
 
-- Shared arrival-time utility for switching, loose balls, press assignment and interception.
-- Turn-rate and momentum cost based on facing and velocity.
-- First-touch outcome based on ball speed, body orientation, pressure and player skill.
-- Separate loose-ball claim state from magnetic possession.
-- Critically damped visual interpolation without changing authoritative positions.
+Use one acceleration-limited arrival-time API for switching, loose balls, pass interception, pressing and keeper rushing. Include reaction delay, current velocity, turn cost, acceleration and maximum speed. Stable entity ID resolves ties.
 
-### Passing
+### Pass completion
 
-- Replace static lane samples with time-to-intercept probability.
-- Include receiver orientation, preferred foot and expected first touch.
-- Add through-ball destination search over safe space, not only teammate position.
-- Assistance presets expose target confidence and permit manual override.
+For opponent `j`, compare opponent arrival with ball arrival:
 
-### Team AI
+```text
+margin_j = tOpponent_j - tBall
+pIntercept_j = logistic(-margin_j / uncertainty)
+pComplete = product(1 - pIntercept_j)
+```
 
-- Dynamic role anchors using ball zone, phase, occupation and threat.
-- Pitch-control grid at 10–15 Hz, not 120 Hz.
-- Pressure-cover-balance defensive assignment.
-- Support triangle, overlap, underlap and third-man run candidates.
-- Team mentality and match-state utility weights.
+Add passer execution, receiver body orientation, preferred foot, pressure and first-touch difficulty.
+
+### Action value
+
+```text
+value(action)
+  = successProbability × reward
+  - failureProbability × turnoverCost
+  - executionCost
+  - staminaCost
+```
+
+Use this for explainable pass, carry, shoot, cross and clear choices. No neural model is required in the authoritative runtime.
+
+### Pitch control and assignments
+
+- initial grid: 24 × 16
+- update around 10–15 Hz, not 120 Hz
+- convert team arrival-time differences to control probabilities
+- assign pressing, cover and marking targets with minimum-cost assignment plus switching penalties
+- dynamic role targets combine formation, ball zone, phase, occupancy and threat
 
 ### Player switching
 
-- Score interception time, danger, stick angle, role and abandonment cost.
-- Add hysteresis and aerial/loose-ball contexts.
-- Right-stick selection later.
+Score candidates using interception time, danger, stick direction, role suitability, momentum and abandonment cost. Add hysteresis, aerial and loose-ball contexts, and explicit right-stick selection.
 
-### Restarts
+### Presentation smoothing
 
-- Jog players into restart targets rather than hard teleport where presentation permits.
-- Quick restart, short corner and distribution options.
-- Set-piece target zones and routines later.
+Simulation remains fixed-step and authoritative. Rendering consumes snapshots and uses exact exponential or critically damped interpolation. Never use presentation smoothing to hide collision or possession errors.
 
-### Goalkeepers
+## 9. Engine audit priorities
 
-- Decision utility for hold/parry/catch/charge/distribute.
-- Ball-flight interception and collision confidence.
-- Distribution risk and team tactical instruction.
+1. complete P0 repository/build reconciliation
+2. finish the career vertical slice
+3. land semantic input and dynamic glyph infrastructure
+4. add deterministic scenario harness
+5. integrate shared arrival-time math
+6. replace static pass-lane samples
+7. contextual switching
+8. dynamic team shape and pitch control
+9. first-touch and loose-ball ownership
+10. smoother restarts and goalkeeper utility
 
-### Match systems
+## 10. Delivery gates
 
-- authoritative event stream for passes, shots, xG, tackles, saves, fouls and possession
-- substitutions and stamina
-- advantage, cards and referee strictness
-- stoppage-time model
-- formations and tactical instructions
-- replay bookmarks generated from event value
+### Gate A — input foundation
 
-## 10. System design connections
+- semantic actions
+- FC-style/eFootball-style/custom mappings
+- active-device resolver
+- glyph labels
+- persistence and remapping tests
 
-Create-a-Club output must feed:
+### Gate B — creator data
 
-- `ClubDefinition`
-- `ClubSeasonState`
-- `SquadRegistration`
-- `ManagerProfile`
-- `PlayerProfile`
-- `ClubVisualIdentity`
-- `TrainingSchedule`
-- `MatchTeamSheet`
+- versioned club, kit, crest, manager and player schemas
+- autosave and migration
 
-Training results emit bounded progression events. They must not directly mutate arbitrary engine constants.
+### Gate C — visual identity
 
-```ts
-interface TrainingResultEvent {
-  drillId: string;
-  playerId: string;
-  seed: number;
-  score: number;
-  medal: 'none' | 'bronze' | 'silver' | 'gold';
-  actionMetrics: Record<string, number>;
-  rewards: TrainingReward[];
-}
-```
+- kit renderer and clash validator
+- crest renderer
+- career/menu/scorebug integration
 
-## 11. Recommended delivery sequence
+### Gate D — drill runner
 
-### Gate 1 — schemas and navigation
+- deterministic scenarios
+- semantic-input traces
+- scoring, medals and bounded rewards
 
-- authoritative club/identity/manager schemas
-- create-club state machine and save draft
-- migration strategy
-- route from new career to creator and back
+### Gate E — football drills
 
-### Gate 2 — visual identity MVP
+- passing and shooting first
+- crossing, dribbling, defending and goalkeeping next
 
-- procedural kit patterns
-- palette and clash validator
-- layered SVG crest renderer
-- review screen
-- scorebug/menu integration
+### Gate F — match intelligence
 
-### Gate 3 — manager and player creator
+- arrival time
+- pass availability
+- switching
+- pitch control
+- assignment and action value
 
-- presets and accessibility
-- difficulty-bound attribute budgets
-- persistence and career integration
+## Acceptance principles
 
-### Gate 4 — drill framework + keepy-uppy
-
-- generic deterministic drill runner
-- retry, medals, event scoring
-- A/left-stick and mouse/LMB controls
-- first-touch progression reward
-
-### Gate 5 — football drills
-
-- passing gates
-- shooting
-- dribbling
-- crossing
-- defending
-- goalkeeper
-
-### Gate 6 — engine improvement tranche
-
-- contextual switching
-- analytic interception
-- dynamic team shape
-- first touch and loose-ball behaviour
-- smoother restarts and goalkeeper logic
-
-## 12. Acceptance principles
-
-- Creator is fully usable by gamepad and mouse.
-- A recognisable club can be made without freehand art.
-- Home and away kits cannot be accidentally indistinguishable.
-- Crest and kits remain original and reproducible from parameters.
-- Manager/player starting stats obey difficulty budgets.
-- Every drill runs from the deterministic scenario framework.
-- Drill inputs map to match controls.
-- Training rewards are bounded and testable.
-- No creator or drill system imports Three.js into authoritative engine modules.
-- A complete flow works: create club → create manager → optional player → training → fixture → progression.
+- drills and matches use identical semantic actions
+- both football-game convention presets are fully playable
+- physical button labels always match the active device and current binding
+- disconnect/reconnect is safe
+- identical seed and semantic input produce identical results
+- assists are explicit settings, not hidden difficulty cheats
+- creator outputs are original, deterministic and saveable
+- no new system bypasses the current vertical-slice and build-health gates
