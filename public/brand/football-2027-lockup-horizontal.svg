@@ -9,6 +9,6 @@
   <g font-family="Inter, Arial, sans-serif">
     <text x="286" y="118" fill="#F2F7FF" font-size="86" font-weight="900" letter-spacing="-4">FOOTBALL</text>
     <text x="286" y="202" fill="#14D1E6" font-size="86" font-weight="900" letter-spacing="-4">2027</text>
-    <text x="550" y="196" fill="#95A4B8" font-size="20" font-weight="700" letter-spacing="3">THE NEXT MATCH STARTS HERE.</text>
+    <text x="530" y="193" fill="#95A4B8" font-size="15" font-weight="700" letter-spacing="2.5">THE NEXT MATCH STARTS HERE.</text>
   </g>
 </svg>
