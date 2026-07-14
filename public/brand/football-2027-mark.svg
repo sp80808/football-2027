@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Football 2027 Forward Pitch mark</title>
+  <desc id="desc">An angular F crossed by a rising diagonal with a centre-circle detail.</desc>
+  <path fill="#14D1E6" d="M28 28h162l-20 40H84v38h72l-19 38H84v84H28z"/>
+  <path fill="#33D677" d="M145 228 228 28h-49L96 228z"/>
+  <circle cx="151" cy="112" r="14" fill="#07101C" stroke="#F2F7FF" stroke-width="5"/>
+</svg>
