@@ -715,6 +715,29 @@ export function RenderingPanel({
           lookZ,
         );
 
+        // Running footstep audio based on active player speed
+        const activeSpeed = activePlayer.vel.mag();
+        if (activeSpeed > 1.5) {
+          audioManager.playFootstep(activeSpeed / SimulationConfig.PLAYER_SPRINT_SPEED);
+        }
+
+        // Pitch calls — occasional vocal shouts when in possession
+        if (activePlayer.controlState === 'under_control' && activeSpeed > 0.5) {
+          if (Math.random() < 0.002) audioManager.playPitchCall();
+        }
+
+        // Update crowd tension bed
+        audioManager.updateCrowd(dt);
+
+        // Swell tension when ball is in the attacking third
+        const ballInAttackingThird = state.ball.pos.y > SimulationConfig.PITCH_HALF_LENGTH * 0.66;
+        const ballInDefendingThird = state.ball.pos.y < -SimulationConfig.PITCH_HALF_LENGTH * 0.66;
+        if (ballInAttackingThird) {
+          audioManager.crowdReaction('tension_up', 0.015);
+        } else if (ballInDefendingThird) {
+          audioManager.crowdReaction('tension_up', 0.008);
+        }
+
         statsPanel?.update();
         renderer.render(scene, camera);
       };

@@ -6,6 +6,7 @@
  */
 import * as THREE from 'three';
 import { WorldState } from '../engine/WorldState';
+import { SimulationConfig } from '../engine/SimulationConfig';
 import type { CameraMode, ZoomIntensity } from '../store/settingsStore';
 
 export interface CameraSettings {
@@ -59,6 +60,7 @@ export class CameraController {
   private shakeVel = new THREE.Vector3();
   private shakeDecay = 0;
   private initialised = false;
+  private currentYaw = 0;
 
   addShake(event: CameraShakeEvent, settings: CameraSettings) {
     if (!settings.shakeEnabled) return;
@@ -87,24 +89,41 @@ export class CameraController {
       activePlayer.pos.y - state.ball.pos.y,
     );
 
-    const ballWeight = preset.ballWeight + (activePlayer.isCharging ? 0.12 : 0);
+    // Context-aware ball/player weight: ball-heavy when ball is in flight (fast, no control),
+    // player-heavy when in possession and charging.
+    const ballInFlight = ballSpeed > 12 && activePlayer.controlState === 'free';
+    const inPossession = activePlayer.controlState === 'under_control' || activePlayer.controlState === 'shielding';
+    let ballWeight = preset.ballWeight;
+    if (ballInFlight) ballWeight = Math.min(0.8, ballWeight + 0.2);
+    else if (inPossession && activePlayer.isCharging) ballWeight += 0.12;
+    else if (inPossession) ballWeight = Math.max(0.2, ballWeight - 0.1);
+
     const playerWeight = 1 - ballWeight;
 
-    const focusX = activePlayer.pos.x * playerWeight + state.ball.pos.x * ballWeight;
-    const focusZ = -(activePlayer.pos.y * playerWeight + state.ball.pos.y * ballWeight);
+    // Velocity-based look-ahead: offset focus by a fraction of player velocity
+    // so the camera leads movement instead of lagging it.
+    const lookAheadX = activePlayer.vel.x * 0.15;
+    const lookAheadZ = -activePlayer.vel.y * 0.15;
+
+    const focusX = activePlayer.pos.x * playerWeight + state.ball.pos.x * ballWeight + lookAheadX;
+    const focusZ = -(activePlayer.pos.y * playerWeight + state.ball.pos.y * ballWeight) + lookAheadZ;
 
     const chargeBoost = activePlayer.isCharging
       ? (activePlayer.chargeStart / 1.2) * (activePlayer.chargeType === 'shoot' ? 0.08 : 0.04)
       : 0;
 
+    // Attacking-third zoom: tighten framing when near the opponent goal.
+    const inAttackingThird = activePlayer.pos.y > SimulationConfig.PITCH_HALF_LENGTH * 0.6 || state.ball.pos.y > SimulationConfig.PITCH_HALF_LENGTH * 0.6;
+    const thirdZoom = inAttackingThird ? 0.85 : 1.0;
+
     const targetDist = THREE.MathUtils.clamp(
-      (preset.distBase + spread * preset.distSpread + ballSpeed * preset.distSpeed - chargeBoost * 8) * zoom,
+      (preset.distBase + spread * preset.distSpread + ballSpeed * preset.distSpeed - chargeBoost * 8) * zoom * thirdZoom,
       10 * zoom,
       35 * zoom,
     );
     const targetHeight = THREE.MathUtils.clamp(
-      (preset.heightBase + spread * preset.heightSpread + chargeBoost * 3) * zoom,
-      10 * zoom,
+      (preset.heightBase + spread * preset.heightSpread + chargeBoost * 3) * zoom * thirdZoom,
+      8 * zoom,
       22 * zoom,
     );
 
@@ -137,6 +156,16 @@ export class CameraController {
     const shakenLook = this.currentLook.clone().add(this.shakeOffset);
     camera.position.add(this.shakeOffset.clone().multiplyScalar(0.35));
     camera.lookAt(shakenLook);
+
+    // Store yaw for camera-relative input transform
+    const dirX = shakenLook.x - camera.position.x;
+    const dirZ = shakenLook.z - camera.position.z;
+    this.currentYaw = Math.atan2(dirX, dirZ);
+  }
+
+  /** Returns the camera's yaw angle in radians (atan2 of look direction in XZ plane). */
+  getYaw(): number {
+    return this.currentYaw;
   }
 
   private updateShake(dt: number, settings: CameraSettings) {

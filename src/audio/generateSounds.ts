@@ -190,3 +190,183 @@ export function generateCrowdAmbience(): string {
   }
   return encodeWav(samples);
 }
+
+/** Crowd tension bed — low rumble that swells near the penalty area. */
+export function generateCrowdTension(): string {
+  const sampleRate = 44100;
+  const length = Math.floor(4.0 * sampleRate);
+  const brown = brownNoiseBuffer(length, sampleRate);
+  const pink = pinkNoiseBuffer(length);
+  const samples = new Float32Array(length);
+  for (let i = 0; i < length; i++) {
+    const t = i / sampleRate;
+    const lfo = 0.9 + 0.1 * Math.sin(2 * Math.PI * 0.3 * t);
+    samples[i] = (brown[i] * 0.3 + pink[i] * 0.04) * lfo;
+  }
+  return encodeWav(samples);
+}
+
+/** Short crowd cheer — one-shot reaction for goals and shots on target. */
+export function generateCrowdCheer(): string {
+  const sampleRate = 44100;
+  const length = Math.floor(1.8 * sampleRate);
+  const pink = pinkNoiseBuffer(length);
+  const samples = new Float32Array(length);
+  for (let i = 0; i < length; i++) {
+    const t = i / sampleRate;
+    const attack = Math.min(1, t / 0.12);
+    const decay = Math.exp(-t * 1.2);
+    samples[i] = pink[i] * 0.45 * attack * decay;
+  }
+  // Rising tonal layer for excitement
+  for (let i = 0; i < length; i++) {
+    const t = i / sampleRate;
+    const env = Math.min(1, t * 5) * Math.exp(-t * 0.9);
+    const rise = 200 + t * 300;
+    samples[i] += Math.sin(2 * Math.PI * rise * t) * 0.04 * env;
+  }
+  return encodeWav(samples);
+}
+
+/** Short crowd gasp — one-shot reaction for shots off target / near misses. */
+export function generateCrowdGasp(): string {
+  const sampleRate = 44100;
+  const length = Math.floor(0.8 * sampleRate);
+  const pink = pinkNoiseBuffer(length);
+  const samples = new Float32Array(length);
+  for (let i = 0; i < length; i++) {
+    const t = i / sampleRate;
+    const attack = Math.min(1, t / 0.05);
+    const decay = Math.exp(-t * 3);
+    samples[i] = pink[i] * 0.22 * attack * decay;
+  }
+  return encodeWav(samples);
+}
+
+/** Short crowd groan/boo — one-shot reaction for fouls / offside. */
+export function generateCrowdGroan(): string {
+  const sampleRate = 44100;
+  const length = Math.floor(1.2 * sampleRate);
+  const brown = brownNoiseBuffer(length, sampleRate);
+  const pink = pinkNoiseBuffer(length);
+  const samples = new Float32Array(length);
+  for (let i = 0; i < length; i++) {
+    const t = i / sampleRate;
+    const attack = Math.min(1, t / 0.08);
+    const decay = Math.exp(-t * 1.5);
+    samples[i] = (brown[i] * 0.2 + pink[i] * 0.08) * attack * decay;
+  }
+  // Descending tonal dissonance
+  for (let i = 0; i < length; i++) {
+    const t = i / sampleRate;
+    const env = Math.min(1, t * 8) * Math.exp(-t * 1.8);
+    const fall = 300 - t * 150;
+    samples[i] += Math.sin(2 * Math.PI * fall * t) * 0.03 * env;
+  }
+  return encodeWav(samples);
+}
+
+/** Grass footstep — soft scuff for running sounds. */
+export function generateFootstepSound(): string {
+  const sampleRate = 44100;
+  const samples = renderSamples(0.06, sampleRate, (t) => {
+    const env = Math.exp(-t * 90);
+    // Filtered noise burst — short and soft, like a boot on grass.
+    const noise = (Math.random() * 2 - 1) * 0.5;
+    // Low body from a quick sine
+    const body = Math.sin(2 * Math.PI * 80 * t) * 0.2;
+    return (noise * 0.4 + body) * env;
+  });
+  return encodeWav(samples);
+}
+
+/** Slide tackle — grass scrape + impact thud. */
+export function generateSlideSound(): string {
+  const sampleRate = 44100;
+  const length = Math.floor(0.4 * sampleRate);
+  const samples = new Float32Array(length);
+  // Scrape: filtered noise with a slow decay
+  const pink = pinkNoiseBuffer(length);
+  for (let i = 0; i < length; i++) {
+    const t = i / sampleRate;
+    const env = Math.exp(-t * 6);
+    samples[i] = pink[i] * 0.3 * env;
+  }
+  // Thud: low-frequency impact at the start
+  for (let i = 0; i < length; i++) {
+    const t = i / sampleRate;
+    const env = Math.exp(-t * 25);
+    samples[i] += Math.sin(2 * Math.PI * 60 * t) * 0.5 * env;
+  }
+  return encodeWav(samples);
+}
+
+/** Keeper save — glove impact. */
+export function generateSaveSound(): string {
+  const sampleRate = 44100;
+  const samples = renderSamples(0.15, sampleRate, (t) => {
+    const env = Math.exp(-t * 22);
+    // Leather impact: mid-frequency punch
+    const punch = Math.sin(2 * Math.PI * 140 * t) * 0.6;
+    // Noise tick for the "smack"
+    const smack = t < 0.008 ? (Math.random() * 2 - 1) * 0.4 : 0;
+    return (punch + smack) * env;
+  });
+  // Layer brown noise for body
+  const brown = brownNoiseBuffer(samples.length, sampleRate);
+  for (let i = 0; i < samples.length; i++) {
+    const t = i / sampleRate;
+    samples[i] += brown[i] * 0.2 * Math.exp(-t * 30);
+  }
+  return encodeWav(samples);
+}
+
+/** Post / crossbar hit — metallic ping. */
+export function generatePostHitSound(): string {
+  const sampleRate = 44100;
+  const samples = renderSamples(0.5, sampleRate, (t) => {
+    const env = Math.exp(-t * 8);
+    // Metallic ring: two high partials with slightly detuned frequencies
+    const ping1 = Math.sin(2 * Math.PI * 1800 * t) * 0.5;
+    const ping2 = Math.sin(2 * Math.PI * 2400 * t) * 0.3;
+    const ping3 = Math.sin(2 * Math.PI * 3100 * t) * 0.15;
+    // Initial impact tick
+    const tick = t < 0.003 ? (Math.random() * 2 - 1) * 0.3 : 0;
+    return (ping1 + ping2 + ping3 + tick) * env;
+  });
+  return encodeWav(samples);
+}
+
+/** Pitch call — short vocal-style "hey" shout. Uses formant synthesis. */
+export function generatePitchCallSound(): string {
+  const sampleRate = 44100;
+  const samples = renderSamples(0.3, sampleRate, (t) => {
+    const env = t < 0.03 ? t / 0.03 : t > 0.25 ? (0.3 - t) / 0.05 : 1;
+    // Glottal pulse train at ~140Hz for a human-like voice source
+    const f0 = 140;
+    const pulse = Math.sign(Math.sin(2 * Math.PI * f0 * t)) * 0.3;
+    // Two formant resonances to shape it into "hey"
+    const formant1 = Math.sin(2 * Math.PI * 500 * t) * 0.4;
+    const formant2 = Math.sin(2 * Math.PI * 1500 * t) * 0.25;
+    return (pulse * 0.3 + formant1 * 0.2 + formant2 * 0.1) * env * 0.5;
+  });
+  return encodeWav(samples);
+}
+
+/** Soft kick variant — for gentle passes and taps. */
+export function generateSoftKickSound(): string {
+  const sampleRate = 44100;
+  const samples = renderSamples(0.1, sampleRate, (t) => {
+    const env = Math.exp(-t * 35);
+    const pitch = 80 + 40 * Math.exp(-t * 40);
+    const thump = Math.sin(2 * Math.PI * pitch * t) * 0.4;
+    const click = t < 0.003 ? (Math.random() * 2 - 1) * 0.15 : 0;
+    return (thump + click) * env;
+  });
+  const brown = brownNoiseBuffer(samples.length, sampleRate);
+  for (let i = 0; i < samples.length; i++) {
+    const t = i / sampleRate;
+    samples[i] += brown[i] * 0.2 * Math.exp(-t * 45);
+  }
+  return encodeWav(samples);
+}

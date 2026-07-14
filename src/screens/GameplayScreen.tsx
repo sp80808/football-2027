@@ -141,13 +141,15 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
           const ballZ = -state.ball.pos.y;
 
           if (event.type === 'kick') {
-            audioManager.playAt('kick', ballX, ballY, ballZ, Math.min(0.9, 0.3 + event.power * 0.4));
+            const power = (event as any).power ?? 1;
+            audioManager.playKick(power);
+            audioManager.playAt('kick', ballX, ballY, ballZ, Math.min(0.9, 0.3 + power * 0.4));
           } else if (event.type === 'bounce') {
-            audioManager.playAt('bounce', ballX, ballY, ballZ, Math.min(0.5, 0.15 + event.intensity * 0.2));
+            audioManager.playAt('bounce', ballX, ballY, ballZ, Math.min(0.5, 0.15 + (event as any).intensity * 0.2));
           } else if (event.type === 'goal') {
             audioManager.playGoal();
             useGameStore.getState().pushPlayEvent({
-              side: event.scorer === 'player' ? 'home' : 'away',
+              side: (event as any).scorer === 'player' ? 'home' : 'away',
               kind: 'goal',
               matchMinute: displayMatchMinute(tsEngine.elapsedSeconds),
               label: 'GOAL',
@@ -159,7 +161,12 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
               matchMinute: displayMatchMinute(tsEngine.elapsedSeconds),
               label: 'SHOT',
             });
+          } else if (event.type === 'shot_on_target') {
+            audioManager.crowdReaction('tension_up', 0.5);
+          } else if (event.type === 'shot_off_target') {
+            audioManager.crowdReaction('gasp', 0.4);
           } else if (event.type === 'offside') {
+            audioManager.crowdReaction('groan', 0.5);
             useGameStore.getState().pushPlayEvent({
               side: event.side === 'player' ? 'home' : 'away',
               kind: 'offside',
@@ -175,10 +182,17 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
               matchMinute: displayMatchMinute(tsEngine.elapsedSeconds),
               label: 'TACKLE WON',
             });
+          } else if (event.type === 'slide') {
+            audioManager.playSlide();
+            audioManager.crowdReaction('groan', 0.2);
+          } else if (event.type === 'save') {
+            audioManager.playSave();
+            if (event.side === 'player') audioManager.crowdReaction('cheer', 0.4);
+          } else if (event.type === 'post_hit') {
+            audioManager.playPostHit();
           } else if (event.type === 'goal_kick' || event.type === 'throw_in' || event.type === 'corner_kick' || event.type === 'free_kick') {
              audioManager.playWhistle();
-             // Play events for dead balls could be added here if desired, 
-             // but MatchPhaseOverlay handles the big on-screen text.
+             audioManager.crowdReaction('tension_up', 0.3);
           }
         }
         useGameStore.getState().prunePlayEvents();

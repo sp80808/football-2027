@@ -30,6 +30,8 @@ export type SimEvent =
   | { type: 'shot_on_target'; side: 'player' | 'opponent' }
   | { type: 'shot_off_target'; side: 'player' | 'opponent' }
   | { type: 'save'; side: 'player' | 'opponent' }
+  | { type: 'slide'; side: 'player' | 'opponent' }
+  | { type: 'post_hit' }
   | { type: 'goal_kick' | 'throw_in' | 'corner_kick' | 'free_kick' };
 
 export class GameEngine {
@@ -81,6 +83,7 @@ export class GameEngine {
   private awaitingOffsideCheck = false;
   private passbackTimer = 0;
   private previousControlState = this.homeTeam[0].controlState;
+  private postHitCooldown = 0;
   public offsideLineY: number | null = null;
   public passTargetId: number | null = null;
 
@@ -272,6 +275,8 @@ export class GameEngine {
 
     this.matchManager.update(this.dt, this.ball, this.homeTeam, this.awayTeam, this.homeKeeper, this.awayKeeper);
 
+    if (this.postHitCooldown > 0) this.postHitCooldown -= this.dt;
+
     const match = this.matchManager.state;
     this.scorePlayer = match.homeScore;
     this.scoreOpponent = match.awayScore;
@@ -431,6 +436,12 @@ export class GameEngine {
         if (this.awayTeam[i].tackleWonThisTick) {
           this.pendingEvents.push({ type: 'tackle', side: 'opponent' });
         }
+        if (this.homeTeam[i].defensiveState === 'sliding' && this.homeFrames[i].slidePressed) {
+          this.pendingEvents.push({ type: 'slide', side: 'player' });
+        }
+        if (this.awayTeam[i].defensiveState === 'sliding' && this.awayFrames[i].slidePressed) {
+          this.pendingEvents.push({ type: 'slide', side: 'opponent' });
+        }
         
         // Track last touch
         if (this.homeTeam[i].controlState !== 'free' || this.homeTeam[i].tackleWonThisTick) {
@@ -478,6 +489,8 @@ export class GameEngine {
 
     if (this.homeKeeper.savedThisTick) this.pendingEvents.push({ type: 'save', side: 'player' });
     if (this.awayKeeper.savedThisTick) this.pendingEvents.push({ type: 'save', side: 'opponent' });
+
+    this.detectPostHit();
 
     this.previousControlState = activePlayer.controlState;
     this.checkBoundaries();
@@ -552,6 +565,30 @@ export class GameEngine {
         this.awayTeam[i].controlState = 'free';
         this.awayTeam[i].isCharging = false;
         this.awayTeam[i].chargeStart = 0;
+    }
+  }
+
+  private detectPostHit() {
+    const cfg = SimulationConfig;
+    const ballSpeed = this.ball.vel.mag();
+    if (ballSpeed < 8) return;
+    const postRadius = 0.06;
+    const goalHalfWidth = cfg.GOAL_HALF_WIDTH;
+    const postY = cfg.PITCH_HALF_LENGTH;
+    const bx = this.ball.pos.x;
+    const by = this.ball.pos.y;
+    const bz = this.ball.pos.z;
+    if (bz < 2.5) {
+      const leftPost = Math.hypot(bx + goalHalfWidth, by - postY);
+      const rightPost = Math.hypot(bx - goalHalfWidth, by - postY);
+      const crossbar = Math.hypot(Math.abs(bx) < goalHalfWidth ? 0 : bx, Math.abs(by - postY), bz - 2.44);
+      if (leftPost < 0.4 || rightPost < 0.4 || crossbar < 0.4) {
+        if (!this.postHitCooldown) this.postHitCooldown = 0;
+        if (this.postHitCooldown <= 0) {
+          this.pendingEvents.push({ type: 'post_hit' });
+          this.postHitCooldown = 0.5;
+        }
+      }
     }
   }
 
