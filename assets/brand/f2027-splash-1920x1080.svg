@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc">
+<title id="title">Football 2027 splash screen concept</title><desc id="desc">Dark stadium tunnel splash with F27 logo, pitch glow and loading indicator.</desc>
+<defs>
+ <linearGradient id="bg" x1="960" y1="0" x2="960" y2="1080"><stop stop-color="#060A10"/><stop offset=".55" stop-color="#0A111B"/><stop offset="1" stop-color="#030507"/></linearGradient>
+ <radialGradient id="stadium" cx="50%" cy="28%" r="70%"><stop stop-color="#173A70" stop-opacity=".52"/><stop offset=".48" stop-color="#0A1320" stop-opacity=".15"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+ <linearGradient id="brand" x1="610" y1="260" x2="1280" y2="780" gradientUnits="userSpaceOnUse"><stop stop-color="#75A7FF"/><stop offset=".5" stop-color="#2F7BFF"/><stop offset="1" stop-color="#22D49B"/></linearGradient>
+ <linearGradient id="pitch" x1="960" y1="670" x2="960" y2="1080"><stop stop-color="#28F0AF" stop-opacity=".33"/><stop offset="1" stop-color="#0A372A" stop-opacity="0"/></linearGradient>
+ <filter id="blur"><feGaussianBlur stdDeviation="32"/></filter><filter id="soft"><feGaussianBlur stdDeviation="8"/></filter>
+</defs>
+<rect width="1920" height="1080" fill="url(#bg)"/><rect width="1920" height="1080" fill="url(#stadium)"/>
+<ellipse cx="960" cy="1020" rx="780" ry="210" fill="url(#pitch)" filter="url(#blur)"/>
+<path d="M170 862C450 710 1470 710 1750 862" fill="none" stroke="#BBD4FF" stroke-opacity=".10" stroke-width="4"/>
+<path d="M270 908C540 790 1380 790 1650 908" fill="none" stroke="#22D49B" stroke-opacity=".18" stroke-width="4"/>
+<path d="M960 734V1080M570 876H1350" stroke="#DDEAFF" stroke-opacity=".07" stroke-width="3"/>
+<ellipse cx="960" cy="878" rx="120" ry="54" fill="none" stroke="#DDEAFF" stroke-opacity=".08" stroke-width="3"/>
+<g opacity=".18"><circle cx="110" cy="145" r="3" fill="#E7F0FF"/><circle cx="178" cy="161" r="3" fill="#E7F0FF"/><circle cx="246" cy="145" r="3" fill="#E7F0FF"/><circle cx="314" cy="161" r="3" fill="#E7F0FF"/><circle cx="382" cy="145" r="3" fill="#E7F0FF"/><circle cx="450" cy="161" r="3" fill="#E7F0FF"/><circle cx="518" cy="145" r="3" fill="#E7F0FF"/><circle cx="586" cy="161" r="3" fill="#E7F0FF"/><circle cx="654" cy="145" r="3" fill="#E7F0FF"/><circle cx="722" cy="161" r="3" fill="#E7F0FF"/><circle cx="790" cy="145" r="3" fill="#E7F0FF"/><circle cx="858" cy="161" r="3" fill="#E7F0FF"/><circle cx="926" cy="145" r="3" fill="#E7F0FF"/><circle cx="994" cy="161" r="3" fill="#E7F0FF"/><circle cx="1062" cy="145" r="3" fill="#E7F0FF"/><circle cx="1130" cy="161" r="3" fill="#E7F0FF"/><circle cx="1198" cy="145" r="3" fill="#E7F0FF"/><circle cx="1266" cy="161" r="3" fill="#E7F0FF"/><circle cx="1334" cy="145" r="3" fill="#E7F0FF"/><circle cx="1402" cy="161" r="3" fill="#E7F0FF"/><circle cx="1470" cy="145" r="3" fill="#E7F0FF"/><circle cx="1538" cy="161" r="3" fill="#E7F0FF"/><circle cx="1606" cy="145" r="3" fill="#E7F0FF"/><circle cx="1674" cy="161" r="3" fill="#E7F0FF"/><circle cx="1742" cy="145" r="3" fill="#E7F0FF"/><circle cx="1810" cy="161" r="3" fill="#E7F0FF"/></g>
+<g transform="translate(704 224)"><rect width="512" height="512" rx="112" fill="#05080D" fill-opacity=".55" stroke="#7EA9E8" stroke-opacity=".18" stroke-width="4"/><path d="M112 118H326L298 174H184V230H276L248 286H184V398H112V118Z" fill="url(#brand)"/><path d="M286 214H400V270L338 334H400V398H270V346L334 278H286V214Z" fill="url(#brand)"/><circle cx="256" cy="256" r="40" fill="none" stroke="#F5F8FC" stroke-opacity=".16" stroke-width="3"/></g>
+<text x="960" y="820" text-anchor="middle" fill="#F5F8FC" font-family="Inter,Arial,sans-serif" font-size="38" font-weight="900" letter-spacing="12">FOOTBALL 2027</text>
+<text x="960" y="870" text-anchor="middle" fill="#91A2B7" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700" letter-spacing="7">BUILD YOUR FOOTBALL STORY</text>
+<rect x="710" y="946" width="500" height="5" rx="2.5" fill="#FFFFFF" fill-opacity=".10"/><rect x="710" y="946" width="338" height="5" rx="2.5" fill="url(#brand)"/><circle cx="1048" cy="948.5" r="13" fill="#2F7BFF" fill-opacity=".42" filter="url(#soft)"/>
+<text x="960" y="994" text-anchor="middle" fill="#91A2B7" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="700" letter-spacing="4">LOADING MATCH ENGINE</text>
+</svg>
