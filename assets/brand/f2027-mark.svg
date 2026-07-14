@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">F2027 monogram</title><desc id="desc">Angular F27 football pitch monogram in electric blue and pitch green.</desc>
+<defs>
+  <linearGradient id="g" x1="72" y1="56" x2="436" y2="456" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#75A7FF"/><stop offset="0.48" stop-color="#2F7BFF"/><stop offset="1" stop-color="#22D49B"/>
+  </linearGradient>
+  <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="12" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="512" height="512" rx="112" fill="#05080D"/>
+<rect x="34" y="34" width="444" height="444" rx="88" fill="none" stroke="#243246" stroke-width="4"/>
+<path d="M112 118H326L298 174H184V230H276L248 286H184V398H112V118Z" fill="url(#g)"/>
+<path d="M286 214H400V270L338 334H400V398H270V346L334 278H286V214Z" fill="url(#g)"/>
+<path d="M112 335H184M328 118V174M400 214V270" stroke="#F5F8FC" stroke-opacity=".55" stroke-width="5"/>
+<circle cx="256" cy="256" r="40" fill="none" stroke="#F5F8FC" stroke-opacity=".16" stroke-width="3"/>
+<path d="M256 216V296M216 256H296" stroke="#F5F8FC" stroke-opacity=".13" stroke-width="3"/>
+<path d="M70 438C164 398 348 398 442 438" fill="none" stroke="url(#g)" stroke-width="7" stroke-linecap="round" filter="url(#glow)" opacity=".9"/>
+</svg>
