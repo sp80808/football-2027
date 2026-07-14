@@ -3,6 +3,7 @@ import { Footballer } from './Footballer';
 import { Ball } from './Ball';
 import { ControllerFrame } from './Intent';
 import { SimulationConfig } from './SimulationConfig';
+import type { AiDifficulty } from '../store/settingsStore';
 
 export class TeamLogic {
   team: 'home' | 'away';
@@ -39,9 +40,22 @@ export class TeamLogic {
     activeId: number | null,
     opponents?: Footballer[],
     teammatePressHeld = false,
+    difficulty: AiDifficulty = 'Professional'
   ) {
     const cfg = SimulationConfig;
     this.opponents = opponents ?? null;
+
+    let reactionMul = 1.0;
+    let tackleThresholdMult = 1.0;
+    let sprintThreshold = 10;
+    
+    switch (difficulty) {
+      case 'Amateur': reactionMul = 1.5; tackleThresholdMult = 0.6; sprintThreshold = 15; break;
+      case 'Semi-Pro': reactionMul = 1.2; tackleThresholdMult = 0.8; sprintThreshold = 12; break;
+      case 'Professional': reactionMul = 1.0; tackleThresholdMult = 1.0; sprintThreshold = 10; break;
+      case 'World Class': reactionMul = 0.7; tackleThresholdMult = 1.2; sprintThreshold = 8; break;
+      case 'Legendary': reactionMul = 0.4; tackleThresholdMult = 1.5; sprintThreshold = 5; break;
+    }
 
     // Determine if team has possession
     let teamHasPossession = false;
@@ -97,11 +111,11 @@ export class TeamLogic {
 
       // AI Behaviour
       if (f.controlState === 'under_control') {
-        this.attackWithBall(i, f, frame, footballers, ball);
+        this.attackWithBall(i, f, frame, footballers, ball, reactionMul);
       } else if (!teamHasPossession) {
-        this.defend(i, f, frame, ball, ballPos, distToBall, i === presserId);
+        this.defend(i, f, frame, ball, ballPos, distToBall, i === presserId, tackleThresholdMult, reactionMul, sprintThreshold);
       } else {
-        this.supportAttack(i, f, frame);
+        this.supportAttack(i, f, frame, sprintThreshold);
       }
     }
   }
@@ -116,6 +130,7 @@ export class TeamLogic {
     frame: ControllerFrame,
     teammates: Footballer[],
     ball: Ball,
+    reactionMul: number
   ) {
     const cfg = SimulationConfig;
     const goalY = this.team === 'home' ? cfg.PITCH_HALF_LENGTH : -cfg.PITCH_HALF_LENGTH;
@@ -127,13 +142,18 @@ export class TeamLogic {
       frame.shootHeld = true;
       frame.shootReleased = f.chargeStart > cfg.MAX_CHARGE_TIME * 0.5;
       frame.leftStick.copy(towardGoal);
-      this.passCooldowns[i] = 1.0;
+      this.passCooldowns[i] = 1.0 * reactionMul;
       return;
     }
 
-    // 2. Evaluate a forward pass — triggered by pressure or a teammate in space.
+    // 2. Evaluate a pass — triggered by pressure or a teammate in space.
     const pressure = this.nearestOpponentDist(f.pos);
-    const passOption = this.bestPassTarget(i, f, teammates);
+    let passOption = this.bestPassTarget(i, f, teammates, false);
+
+    // If highly pressured and no forward pass, look for a backward pass
+    if (!passOption && pressure < 3.0) {
+      passOption = this.bestPassTarget(i, f, teammates, true);
+    }
 
     const wantsPass =
       this.passCooldowns[i] <= 0 &&
@@ -146,12 +166,16 @@ export class TeamLogic {
       const dirToMate = new Vec2(passOption.pos.x - f.pos.x, passOption.pos.y - f.pos.y);
       if (dirToMate.magSq() > 0.01) dirToMate.normalize();
       frame.leftStick.copy(dirToMate);
+      
+      // If we just received the ball (or have a lot of pressure), we might want a quick pass (one-two)
+      const quickPass = pressure < 1.5;
+
       // Charge the pass briefly, then release.
       if (!f.isCharging || f.chargeType !== 'pass') {
         frame.passHeld = true;
-      } else if (f.chargeStart > cfg.MAX_CHARGE_TIME * 0.25) {
+      } else if (f.chargeStart > cfg.MAX_CHARGE_TIME * (quickPass ? 0.15 : 0.25)) {
         frame.passReleased = true;
-        this.passCooldowns[i] = 0.8;
+        this.passCooldowns[i] = 0.8 * reactionMul;
       }
       return;
     }
@@ -161,11 +185,11 @@ export class TeamLogic {
     if (distToGoal > 35) frame.sprint = 1;
   }
 
-  /** Pick the best teammate to pass to: forward progress + openness, no opponents in the lane. */
   private bestPassTarget(
     passerIdx: number,
     passer: Footballer,
     teammates: Footballer[],
+    allowBackward: boolean
   ): { pos: Vec2; gainForward: number; openness: number } | null {
     const cfg = SimulationConfig;
     const goalY = this.team === 'home' ? cfg.PITCH_HALF_LENGTH : -cfg.PITCH_HALF_LENGTH;
@@ -185,15 +209,23 @@ export class TeamLogic {
       const mateToGoal = goalY - mate.pos.y;
       const gainForward = passerToGoal - mateToGoal; // positive = mate is more advanced
 
-      // Only pass forward or sideways (don't pass backward unless very pressured — handled by caller).
-      if (gainForward < -8) continue;
+      // Only pass forward or sideways unless allowBackward is true.
+      if (!allowBackward && gainForward < -8) continue;
+      if (allowBackward && gainForward >= -8) continue; // backward pass only evaluates backward options
 
       // Openness: distance from nearest opponent to the teammate.
       const openness = this.nearestOpponentDist(mate.pos);
 
-      // Is the passing lane blocked? Skip if an opponent is very close to the lane midpoint.
-      const midPoint = new Vec2((passer.pos.x + mate.pos.x) / 2, (passer.pos.y + mate.pos.y) / 2);
-      const laneBlocked = this.nearestOpponentDist(midPoint) < 2.5;
+      // Evaluate the passing lane using 3 sample points
+      const p1 = new Vec2(passer.pos.x + toMate.x * 0.25, passer.pos.y + toMate.y * 0.25);
+      const p2 = new Vec2(passer.pos.x + toMate.x * 0.50, passer.pos.y + toMate.y * 0.50);
+      const p3 = new Vec2(passer.pos.x + toMate.x * 0.75, passer.pos.y + toMate.y * 0.75);
+      
+      const laneBlocked = 
+        this.nearestOpponentDist(p1) < 2.0 || 
+        this.nearestOpponentDist(p2) < 2.5 || 
+        this.nearestOpponentDist(p3) < 2.0;
+        
       if (laneBlocked) continue;
 
       const score = gainForward * 1.0 + openness * 0.5 - dist * 0.1;
@@ -223,6 +255,9 @@ export class TeamLogic {
     ballPos: Vec2,
     distToBall: number,
     isPresser = false,
+    tackleThresholdMult: number,
+    reactionMul: number,
+    sprintThreshold: number
   ) {
     const cfg = SimulationConfig;
     // The designated FC26 secondary presser chases the ball aggressively from
@@ -233,10 +268,10 @@ export class TeamLogic {
       frame.leftStick.set(ball.pos.x - f.pos.x, ball.pos.y - f.pos.y).normalize();
       if (distToBall > 3) frame.sprint = 1;
 
-      const tackleThreshold = isPresser ? 2.0 : 1.5;
+      const tackleThreshold = (isPresser ? 2.0 : 1.5) * tackleThresholdMult;
       if (distToBall < tackleThreshold && this.tackleCooldowns[i] <= 0) {
         frame.tacklePressed = true;
-        this.tackleCooldowns[i] = isPresser ? 0.7 : 1.0;
+        this.tackleCooldowns[i] = (isPresser ? 0.7 : 1.0) * reactionMul;
       }
     } else {
       // Track back to positional anchor
@@ -250,12 +285,12 @@ export class TeamLogic {
 
       if (distToTarget > 1.0) {
         frame.leftStick.set(dx, dy).normalize();
-        if (distToTarget > 10) frame.sprint = 1;
+        if (distToTarget > sprintThreshold) frame.sprint = 1;
       }
     }
   }
 
-  private supportAttack(i: number, f: Footballer, frame: ControllerFrame) {
+  private supportAttack(i: number, f: Footballer, frame: ControllerFrame, sprintThreshold: number) {
     const cfg = SimulationConfig;
     const anchor = TeamLogic.POSITIONS[i];
     const targetX = anchor.x;
@@ -267,7 +302,7 @@ export class TeamLogic {
 
     if (distToTarget > 1.0) {
       frame.leftStick.set(dx, dy).normalize();
-      if (distToTarget > 15) frame.sprint = 1;
+      if (distToTarget > sprintThreshold) frame.sprint = 1;
     }
   }
 }

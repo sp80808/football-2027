@@ -13,6 +13,8 @@ import { ControllerFrame, createEmptyFrame } from './Intent';
 import { ReplayData, ReplayRecorder } from './ReplayRecorder';
 import { MatchManager, MatchSnapshot } from './MatchManager';
 import { TargetFinder } from './TargetFinder';
+import { DeadBallManager } from './DeadBallManager';
+import { useSettingsStore } from '../store/settingsStore';
 
 const DEFAULT_SIM_SEED = 12345;
 
@@ -27,7 +29,8 @@ export type SimEvent =
   | { type: 'pass_completed'; side: 'player' | 'opponent' }
   | { type: 'shot_on_target'; side: 'player' | 'opponent' }
   | { type: 'shot_off_target'; side: 'player' | 'opponent' }
-  | { type: 'save'; side: 'player' | 'opponent' };
+  | { type: 'save'; side: 'player' | 'opponent' }
+  | { type: 'goal_kick' | 'throw_in' | 'corner_kick' | 'free_kick' };
 
 export class GameEngine {
   input = new InputSystem();
@@ -49,6 +52,8 @@ export class GameEngine {
   random = new SeededRandom(DEFAULT_SIM_SEED);
   replayRecorder = new ReplayRecorder(DEFAULT_SIM_SEED);
   matchManager = new MatchManager();
+  deadBall = new DeadBallManager();
+  lastTouchTeam: 'home' | 'away' = 'home';
 
   private readonly dt = SimulationConfig.DT;
   private accumulator = 0;
@@ -153,6 +158,8 @@ export class GameEngine {
     this.passbackTimer = 0;
     this.offsideLineY = null;
     this.passTargetId = null;
+    this.deadBall.reset();
+    this.lastTouchTeam = 'home';
     this.captureState(this.previousState, 0);
     this.captureState(this.currentState, 0);
     copyWorldState(this.currentState, this.renderState);
@@ -302,6 +309,18 @@ export class GameEngine {
 
     const humanInput = this.input.currentFrame;
 
+    if (this.deadBall.isActive) {
+      const activePlayer = this.homeTeam[this.activeHomeIndex];
+      this.deadBall.update(
+        this.dt, this.ball, this.homeTeam, this.awayTeam, this.homeKeeper, this.awayKeeper,
+        humanInput.shootReleased, humanInput.leftStick
+      );
+      if (this.deadBall.resumedThisTick) {
+         this.pendingEvents.push({ type: 'whistle' });
+      }
+      return;
+    }
+
     // Handle Player Switching
     if (humanInput.switchPressed) {
       let bestDist = Infinity;
@@ -317,8 +336,10 @@ export class GameEngine {
       this.activeHomeIndex = bestIdx;
     }
 
-    this.homeLogic.update(this.dt, this.homeTeam, this.homeFrames, this.ball, this.activeHomeIndex, this.awayTeam, humanInput.teammatePressHeld);
-    this.awayLogic.update(this.dt, this.awayTeam, this.awayFrames, this.ball, null, this.homeTeam);
+    const aiDifficulty = typeof window !== 'undefined' ? useSettingsStore.getState().aiDifficulty : 'Professional';
+
+    this.homeLogic.update(this.dt, this.homeTeam, this.homeFrames, this.ball, this.activeHomeIndex, this.awayTeam, humanInput.teammatePressHeld, aiDifficulty);
+    this.awayLogic.update(this.dt, this.awayTeam, this.awayFrames, this.ball, null, this.homeTeam, false, aiDifficulty);
 
     // Inject human input into active player
     this.homeFrames[this.activeHomeIndex] = humanInput;
@@ -410,12 +431,28 @@ export class GameEngine {
         if (this.awayTeam[i].tackleWonThisTick) {
           this.pendingEvents.push({ type: 'tackle', side: 'opponent' });
         }
+        
+        // Track last touch
+        if (this.homeTeam[i].controlState !== 'free' || this.homeTeam[i].tackleWonThisTick) {
+          this.lastTouchTeam = 'home';
+        }
+        if (this.awayTeam[i].controlState !== 'free' || this.awayTeam[i].tackleWonThisTick) {
+          this.lastTouchTeam = 'away';
+        }
     }
 
     const denyPassback = this.passbackTimer > 0 && this.ball.pos.y > SimulationConfig.PITCH_HALF_LENGTH - SimulationConfig.KEEPER_BOX_DEPTH;
     this.homeKeeper.update(this.dt, this.ball, humanInput.keeperRushHeld, denyPassback);
     this.awayKeeper.update(this.dt, this.ball, false, false); // AI keeper never rushes directly yet
     
+    if (this.homeKeeper.aiState === 'diving' || this.homeKeeper.aiState === 'positioning' /* will add holding later */) {
+      // rough proxy for keeper touch
+      if (Math.hypot(this.ball.pos.x - this.homeKeeper.pos.x, this.ball.pos.y - this.homeKeeper.pos.y) < 2) this.lastTouchTeam = 'home';
+    }
+    if (this.awayKeeper.aiState === 'diving' || this.awayKeeper.aiState === 'positioning') {
+      if (Math.hypot(this.ball.pos.x - this.awayKeeper.pos.x, this.ball.pos.y - this.awayKeeper.pos.y) < 2) this.lastTouchTeam = 'away';
+    }
+
     this.ball.update(this.dt);
 
     this.updateOffsideLine();
@@ -443,7 +480,7 @@ export class GameEngine {
     if (this.awayKeeper.savedThisTick) this.pendingEvents.push({ type: 'save', side: 'opponent' });
 
     this.previousControlState = activePlayer.controlState;
-    this.enforceBoundaries();
+    this.checkBoundaries();
   }
 
   private isShotOnTarget(side: 'player' | 'opponent'): boolean {
@@ -518,21 +555,29 @@ export class GameEngine {
     }
   }
 
-  private enforceBoundaries() {
+  private checkBoundaries() {
     const cfg = SimulationConfig;
-    if (this.ball.pos.x > cfg.PITCH_HALF_WIDTH) {
-      this.ball.pos.x = cfg.PITCH_HALF_WIDTH;
-      this.ball.vel.x *= -0.5;
-    } else if (this.ball.pos.x < -cfg.PITCH_HALF_WIDTH) {
-      this.ball.pos.x = -cfg.PITCH_HALF_WIDTH;
-      this.ball.vel.x *= -0.5;
-    }
+    
+    if (this.deadBall.isActive) return;
+
+    // Check goal lines
     if (this.ball.pos.y > cfg.PITCH_HALF_LENGTH) {
-      this.ball.pos.y = cfg.PITCH_HALF_LENGTH;
-      this.ball.vel.y *= -0.5;
+       // Outside goal width
+       if (Math.abs(this.ball.pos.x) > cfg.GOAL_HALF_WIDTH) {
+          this.deadBall.triggerGoalLineOut('away_end', this.ball.pos.x, this.lastTouchTeam, this.homeTeam, this.awayTeam, this.homeKeeper, this.awayKeeper);
+          this.pendingEvents.push({ type: this.deadBall.state.type as 'goal_kick' | 'corner_kick' });
+       }
     } else if (this.ball.pos.y < -cfg.PITCH_HALF_LENGTH) {
-      this.ball.pos.y = -cfg.PITCH_HALF_LENGTH;
-      this.ball.vel.y *= -0.5;
+       if (Math.abs(this.ball.pos.x) > cfg.GOAL_HALF_WIDTH) {
+          this.deadBall.triggerGoalLineOut('home_end', this.ball.pos.x, this.lastTouchTeam, this.homeTeam, this.awayTeam, this.homeKeeper, this.awayKeeper);
+          this.pendingEvents.push({ type: this.deadBall.state.type as 'goal_kick' | 'corner_kick' });
+       }
+    }
+
+    // Check sidelines
+    if (this.ball.pos.x > cfg.PITCH_HALF_WIDTH || this.ball.pos.x < -cfg.PITCH_HALF_WIDTH) {
+       this.deadBall.triggerThrowIn(this.ball.pos.x, this.ball.pos.y, this.lastTouchTeam, this.homeTeam, this.awayTeam);
+       this.pendingEvents.push({ type: 'throw_in' });
     }
   }
 
@@ -574,10 +619,12 @@ export class GameEngine {
     state.homeKeeper.pos.copy(this.homeKeeper.pos);
     state.homeKeeper.facing.copy(this.homeKeeper.facing);
     state.homeKeeper.aiState = this.homeKeeper.aiState;
+    state.homeKeeper.isHoldingBall = this.homeKeeper.isHoldingBall;
 
     state.awayKeeper.pos.copy(this.awayKeeper.pos);
     state.awayKeeper.facing.copy(this.awayKeeper.facing);
     state.awayKeeper.aiState = this.awayKeeper.aiState;
+    state.awayKeeper.isHoldingBall = this.awayKeeper.isHoldingBall;
 
     state.ball.pos.copy(this.ball.pos);
     state.ball.vel.copy(this.ball.vel);
@@ -586,5 +633,6 @@ export class GameEngine {
     state.scoreOpponent = this.scoreOpponent;
     state.lastGoalScorer = this.lastGoalScorer;
     state.offsideLineY = this.offsideLineY;
+    state.deadBallState = this.deadBall.isActive ? this.deadBall.state.type : null;
   }
 }

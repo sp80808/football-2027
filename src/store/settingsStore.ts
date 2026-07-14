@@ -6,6 +6,7 @@ import { setMatchDurationSeconds } from '../engine/matchDuration';
 export type CameraMode = 'broadcast' | 'action' | 'steady' | 'dynamic';
 export type ZoomIntensity = 'low' | 'medium' | 'high';
 export type DevMatchDuration = 90 | 180;
+export type AiDifficulty = 'Amateur' | 'Semi-Pro' | 'Professional' | 'World Class' | 'Legendary';
 
 export interface SettingsState {
   cameraMode: CameraMode;
@@ -16,6 +17,7 @@ export interface SettingsState {
   commentaryVolume: number;
   commentaryVoice: CommentaryVoiceId;
   devMatchDuration: DevMatchDuration;
+  aiDifficulty: AiDifficulty;
   settingsOpen: boolean;
   activeModifierLabel: string | null;
   setCameraMode: (mode: CameraMode) => void;
@@ -26,6 +28,7 @@ export interface SettingsState {
   setCommentaryVolume: (volume: number) => void;
   setCommentaryVoice: (voice: CommentaryVoiceId) => void;
   setDevMatchDuration: (seconds: DevMatchDuration) => void;
+  setAiDifficulty: (difficulty: AiDifficulty) => void;
   setSettingsOpen: (open: boolean) => void;
   setActiveModifierLabel: (label: string | null) => void;
   flashModifierLabel: (label: string) => void;
@@ -42,6 +45,7 @@ interface PersistedSettings {
   commentaryVolume: number;
   commentaryVoice: CommentaryVoiceId;
   devMatchDuration: DevMatchDuration;
+  aiDifficulty: AiDifficulty;
 }
 
 function loadPersisted(): Partial<PersistedSettings> {
@@ -79,6 +83,7 @@ function snapshot(get: () => SettingsState): PersistedSettings {
     commentaryVolume: get().commentaryVolume,
     commentaryVoice: get().commentaryVoice,
     devMatchDuration: get().devMatchDuration,
+    aiDifficulty: get().aiDifficulty,
   };
 }
 
@@ -91,6 +96,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   commentaryVolume: saved.commentaryVolume ?? 1,
   commentaryVoice: saved.commentaryVoice ?? DEFAULT_COMMENTARY_VOICE,
   devMatchDuration: initialDevMatchDuration,
+  aiDifficulty: saved.aiDifficulty ?? 'Professional',
   settingsOpen: false,
   activeModifierLabel: null,
   setCameraMode: (cameraMode) => { set({ cameraMode }); persist(snapshot(get)); },
@@ -107,6 +113,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setDevMatchDuration: (devMatchDuration) => {
     setMatchDurationSeconds(devMatchDuration);
     set({ devMatchDuration });
+    persist(snapshot(get));
+  },
+  setAiDifficulty: (aiDifficulty) => {
+    set({ aiDifficulty });
     persist(snapshot(get));
   },
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),

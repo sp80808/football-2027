@@ -4,6 +4,7 @@ import { Panel } from '../components/ui/Panel';
 import { ControlBindingsPanel } from '../components/ControlGlyph';
 import { MenuBackdrop } from '../components/MenuBackdrop';
 import { ChevronLeft } from 'lucide-react';
+import { useSettingsStore } from '../store/settingsStore';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -60,12 +61,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
                     <h3 className="m-0 text-lg font-bold text-text-primary">Difficulty</h3>
                     <p className="m-0 text-sm text-text-muted">Adjust AI intelligence and reaction time</p>
                   </div>
-                  <select className="rounded border border-border bg-surface px-4 py-2 text-text-primary outline-none focus:border-accent-action">
-                    <option>Amateur</option>
-                    <option>Semi-Pro</option>
-                    <option>Professional</option>
-                    <option>World Class</option>
-                    <option>Legendary</option>
+                  <select
+                    className="rounded border border-border bg-surface px-4 py-2 text-text-primary outline-none focus:border-accent-action"
+                    value={useSettingsStore((s) => s.aiDifficulty)}
+                    onChange={(e) => useSettingsStore.getState().setAiDifficulty(e.target.value as any)}
+                  >
+                    <option value="Amateur">Amateur</option>
+                    <option value="Semi-Pro">Semi-Pro</option>
+                    <option value="Professional">Professional</option>
+                    <option value="World Class">World Class</option>
+                    <option value="Legendary">Legendary</option>
                   </select>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-white/5 p-4">

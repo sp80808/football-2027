@@ -2,17 +2,19 @@ import { Vec2 } from './Math';
 import { Ball } from './Ball';
 import { SimulationConfig } from './SimulationConfig';
 
-export type KeeperState = 'positioning' | 'diving' | 'recovering';
+export type KeeperState = 'positioning' | 'diving' | 'recovering' | 'holding' | 'distributing';
 
 export class Keeper {
   pos = new Vec2(0, 52);
   facing = new Vec2(0, -1);
   aiState: KeeperState = 'positioning';
+  isHoldingBall = false;
 
   /** True on the tick the keeper deflects or punches the ball (for save tracking). */
   savedThisTick = false;
 
   private diveTimer = 0;
+  private holdTimer = 0;
   private diveVelocity = new Vec2(0, 0);
   private readonly scratchToBall = new Vec2();
   private readonly scratchBallPos = new Vec2();
@@ -22,6 +24,8 @@ export class Keeper {
   resetState() {
     this.aiState = 'positioning';
     this.diveTimer = 0;
+    this.holdTimer = 0;
+    this.isHoldingBall = false;
     this.diveVelocity.set(0, 0);
     this.facing.set(0, -1);
     this.savedThisTick = false;
@@ -31,6 +35,8 @@ export class Keeper {
     this.savedThisTick = false;
     if (this.aiState === 'positioning') this.updatePositioning(dt, ball, rushHeld, denyPassbackCollection);
     else if (this.aiState === 'diving') this.updateDiving(dt, ball);
+    else if (this.aiState === 'holding') this.updateHolding(dt, ball);
+    else if (this.aiState === 'distributing') this.updateDistributing(dt, ball);
     else this.updateRecovering(dt);
   }
 
@@ -98,6 +104,13 @@ export class Keeper {
     const distanceToBall = this.pos.distanceTo(this.scratchBallPos);
     const approaching = ball.vel.y > 1;
 
+    let saveRadius = cfg.KEEPER_SAVE_RADIUS;
+    if (autoRush || userRush) {
+      if (distanceToBall < cfg.KEEPER_SPREAD_DIST) {
+        saveRadius *= cfg.KEEPER_SPREAD_RADIUS_MULT; // spread save
+      }
+    }
+
     if (
       approaching
       && ballSpeed >= cfg.KEEPER_DIVE_MIN_BALL_SPEED
@@ -108,8 +121,16 @@ export class Keeper {
       return;
     }
 
-    if (distanceToBall < cfg.KEEPER_SAVE_RADIUS && ball.pos.z < cfg.GOAL_HEIGHT) {
-      if (denyPassbackCollection && ballSpeed < cfg.KEEPER_LOOSE_BALL_MAX_SPEED * 1.5) this.punchClear(ball); else this.deflect(ball);
+    if (distanceToBall < saveRadius && ball.pos.z < cfg.GOAL_HEIGHT) {
+      if (denyPassbackCollection && ballSpeed < cfg.KEEPER_LOOSE_BALL_MAX_SPEED * 1.5) {
+        this.punchClear(ball);
+      } else {
+        if (ballSpeed < cfg.KEEPER_CATCH_MAX_SPEED && ball.pos.z < 2.0 && !denyPassbackCollection) {
+          this.catchBall(ball);
+        } else {
+          this.deflect(ball);
+        }
+      }
     }
 
     if (
@@ -127,13 +148,17 @@ export class Keeper {
     goalLineY: number,
     boxEdgeY: number,
   ): boolean {
-    if (ball.pos.y < boxEdgeY || ball.pos.y > goalLineY) return false;
+    if (ball.pos.y < boxEdgeY - cfg.KEEPER_1V1_RUSH_DIST || ball.pos.y > goalLineY) return false;
     const ballSpeed = Math.hypot(ball.vel.x, ball.vel.y);
     const throughBall =
       ball.vel.y >= cfg.KEEPER_THROUGH_BALL_MIN_VY
       && ballSpeed >= cfg.KEEPER_THROUGH_BALL_MIN_SPEED;
-    const inRushZone = ball.pos.y >= boxEdgeY + cfg.KEEPER_BOX_DEPTH * 0.35;
-    return throughBall && inRushZone && ball.pos.z < cfg.GOAL_HEIGHT;
+    
+    // 1-on-1 check: ball is in our half, approaching goal
+    const oneOnOne = ball.pos.y >= boxEdgeY - cfg.KEEPER_1V1_RUSH_DIST && ball.vel.y > 0.5;
+
+    const inRushZone = ball.pos.y >= boxEdgeY + cfg.KEEPER_BOX_DEPTH * 0.35 || oneOnOne;
+    return (throughBall || oneOnOne) && inRushZone && ball.pos.z < cfg.GOAL_HEIGHT;
   }
 
   private isLooseBallInBox(ball: Ball, cfg: typeof SimulationConfig, goalLineY: number): boolean {
@@ -185,7 +210,13 @@ export class Keeper {
 
     this.scratchBallPos.set(ball.pos.x, ball.pos.y);
     const distanceToBall = this.pos.distanceTo(this.scratchBallPos);
-    if (distanceToBall < cfg.KEEPER_SAVE_RADIUS && ball.pos.z < cfg.GOAL_HEIGHT) this.deflect(ball);
+    if (distanceToBall < cfg.KEEPER_SAVE_RADIUS && ball.pos.z < cfg.GOAL_HEIGHT) {
+      if (Math.hypot(ball.vel.x, ball.vel.y) < cfg.KEEPER_CATCH_MAX_SPEED && ball.pos.z < 2.0) {
+        this.catchBall(ball);
+      } else {
+        this.deflect(ball);
+      }
+    }
 
     this.diveTimer -= dt;
     if (this.diveTimer <= 0) {
@@ -228,9 +259,44 @@ export class Keeper {
     this.aiState = 'diving';
   }
 
+  private catchBall(ball: Ball) {
+    this.aiState = 'holding';
+    this.isHoldingBall = true;
+    this.holdTimer = SimulationConfig.KEEPER_HOLD_DURATION;
+    ball.vel.set(0, 0, 0);
+    ball.spin.set(0, 0, 0);
+    this.savedThisTick = true;
+  }
+
+  private updateHolding(dt: number, ball: Ball) {
+    this.holdTimer -= dt;
+    // Tether ball to keeper
+    ball.pos.set(this.pos.x + this.facing.x * 0.5, this.pos.y + this.facing.y * 0.5, 0.5);
+    ball.vel.set(0, 0, 0);
+
+    if (this.holdTimer <= 0) {
+      this.aiState = 'distributing';
+    }
+  }
+
+  private updateDistributing(dt: number, ball: Ball) {
+    const cfg = SimulationConfig;
+    // Auto distribute upfield
+    const power = cfg.KEEPER_PUNT_POWER;
+    // Face forward
+    this.facing.set(0, this.pos.y > 0 ? -1 : 1);
+    
+    ball.vel.set(this.facing.x * power * 0.3, this.facing.y * power, cfg.KEEPER_PUNT_LIFT);
+    this.isHoldingBall = false;
+    this.aiState = 'recovering';
+    this.diveTimer = 0.5; // brief recovery pause
+  }
+
   private deflect(ball: Ball) {
-    ball.vel.y = -Math.abs(ball.vel.y) * 0.4;
-    ball.vel.x *= -0.3;
+    // Parry to the sides instead of straight back
+    const deflectDir = Math.sign(ball.pos.x);
+    ball.vel.y = -Math.abs(ball.vel.y) * 0.2;
+    ball.vel.x = deflectDir * (Math.abs(ball.vel.x) * 0.5 + 4);
     ball.vel.z *= 0.5;
     this.savedThisTick = true;
   }

@@ -25,7 +25,8 @@ export interface BallState {
 export interface KeeperWorldState {
   pos: Vec2;
   facing: Vec2;
-  aiState: 'positioning' | 'diving' | 'recovering';
+  aiState: 'positioning' | 'diving' | 'recovering' | 'holding' | 'distributing';
+  isHoldingBall: boolean;
 }
 
 export interface WorldState {
@@ -41,6 +42,7 @@ export interface WorldState {
   lastGoalScorer: 'player' | 'opponent' | null;
   offsideLineY: number | null;
   passTargetId: number | null;
+  deadBallState: string | null;
 }
 
 function createEmptyFootballer(id: number): FootballerState {
@@ -65,8 +67,8 @@ export function createEmptyWorldState(): WorldState {
     tick: 0,
     homeTeam: Array.from({ length: 10 }, (_, i) => createEmptyFootballer(i)),
     awayTeam: Array.from({ length: 10 }, (_, i) => createEmptyFootballer(i)),
-    homeKeeper: { pos: new Vec2(0, 52), facing: new Vec2(0, -1), aiState: 'positioning' },
-    awayKeeper: { pos: new Vec2(0, -52), facing: new Vec2(0, 1), aiState: 'positioning' },
+    homeKeeper: { pos: new Vec2(0, 52), facing: new Vec2(0, -1), aiState: 'positioning', isHoldingBall: false },
+    awayKeeper: { pos: new Vec2(0, -52), facing: new Vec2(0, 1), aiState: 'positioning', isHoldingBall: false },
     activeHomeIndex: 0,
     ball: { pos: new Vec3(0, 0, 0), vel: new Vec3(0, 0, 0) },
     scorePlayer: 0,
@@ -74,6 +76,7 @@ export function createEmptyWorldState(): WorldState {
     lastGoalScorer: null,
     offsideLineY: null,
     passTargetId: null,
+    deadBallState: null,
   };
 }
 
@@ -113,10 +116,12 @@ export function copyWorldState(src: WorldState, dest: WorldState) {
   dest.homeKeeper.pos.copy(src.homeKeeper.pos);
   dest.homeKeeper.facing.copy(src.homeKeeper.facing);
   dest.homeKeeper.aiState = src.homeKeeper.aiState;
+  dest.homeKeeper.isHoldingBall = src.homeKeeper.isHoldingBall;
 
   dest.awayKeeper.pos.copy(src.awayKeeper.pos);
   dest.awayKeeper.facing.copy(src.awayKeeper.facing);
   dest.awayKeeper.aiState = src.awayKeeper.aiState;
+  dest.awayKeeper.isHoldingBall = src.awayKeeper.isHoldingBall;
 
   dest.ball.pos.copy(src.ball.pos);
   dest.ball.vel.copy(src.ball.vel);
@@ -126,6 +131,7 @@ export function copyWorldState(src: WorldState, dest: WorldState) {
   dest.lastGoalScorer = src.lastGoalScorer;
   dest.offsideLineY = src.offsideLineY;
   dest.passTargetId = src.passTargetId;
+  dest.deadBallState = src.deadBallState;
 }
 
 export function interpolateWorldState(previous: WorldState, next: WorldState, alpha: number, result: WorldState) {

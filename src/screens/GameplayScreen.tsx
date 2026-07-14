@@ -175,6 +175,10 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
               matchMinute: displayMatchMinute(tsEngine.elapsedSeconds),
               label: 'TACKLE WON',
             });
+          } else if (event.type === 'goal_kick' || event.type === 'throw_in' || event.type === 'corner_kick' || event.type === 'free_kick') {
+             audioManager.playWhistle();
+             // Play events for dead balls could be added here if desired, 
+             // but MatchPhaseOverlay handles the big on-screen text.
           }
         }
         useGameStore.getState().prunePlayEvents();

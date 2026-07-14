@@ -32,8 +32,11 @@ export class TargetFinder {
       toMate.normalize();
       const dot = dir.dot(toMate);
 
-      // Must be within roughly 45 degrees of the stick direction
-      if (dot > 0.707) {
+      // Must be within roughly 45 degrees (dot > 0.707) of the stick direction,
+      // or wider (e.g. 60 degrees, dot > 0.5) if it's a short pass (< 10m).
+      const dotThreshold = dist < 10.0 ? SimulationConfig.SHORT_PASS_ANGLE_DOT : 0.707;
+
+      if (dot > dotThreshold) {
         // Score is primarily based on angle, with a tiny distance tie-breaker 
         // to prefer closer players if angles are identical.
         const score = dot - (dist * 0.001);
@@ -45,6 +48,20 @@ export class TargetFinder {
     }
 
     return bestId;
+  }
+
+  /**
+   * Calculates a target position for a pass, leading the receiver if they are moving.
+   */
+  static getPassTargetPos(mate: Footballer, passPower: number): Vec2 {
+    const dist = mate.pos.distanceTo(mate.pos); // Wait, this doesn't make sense if we don't have passer.
+    // We don't need passer pos if we just use a rough speed.
+    // Actually, we can just lead based on mate.vel and passPower.
+    const leadTime = 15.0 / (passPower * 0.7 + 1); // rough time-of-flight guess
+    return new Vec2(
+      mate.pos.x + mate.vel.x * leadTime * SimulationConfig.PASS_LEAD_FACTOR,
+      mate.pos.y + mate.vel.y * leadTime * SimulationConfig.PASS_LEAD_FACTOR
+    );
   }
 
   /**
