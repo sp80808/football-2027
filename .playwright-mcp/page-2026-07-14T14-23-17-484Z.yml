@@ -1,0 +1,55 @@
+- generic [ref=e44]:
+  - generic [ref=e45]:
+    - generic [ref=e46]:
+      - button [ref=e47] [cursor=pointer]
+      - heading "Quick Match" [level=1] [ref=e52]
+    - button [ref=e53] [cursor=pointer]
+  - generic [ref=e58]:
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - heading "Home Team" [level=2] [ref=e63]
+        - generic [ref=e64]: Player 1
+      - generic [ref=e68]: TEAM A
+      - generic [ref=e70]:
+        - generic [ref=e71]:
+          - generic [ref=e72]: Overall
+          - generic [ref=e73]: "85"
+        - generic [ref=e74]:
+          - generic [ref=e75]: Formation
+          - generic [ref=e76]: 4-3-3
+    - generic [ref=e77]: VS
+    - generic [ref=e80]:
+      - generic [ref=e81]:
+        - heading "Away Team" [level=2] [ref=e82]
+        - generic [ref=e83]: CPU
+      - generic [ref=e87]: TEAM B
+      - generic [ref=e89]:
+        - generic [ref=e90]:
+          - generic [ref=e91]: Overall
+          - generic [ref=e92]: "82"
+        - generic [ref=e93]:
+          - generic [ref=e94]: Formation
+          - generic [ref=e95]: 4-4-2
+  - generic [ref=e96]:
+    - paragraph [ref=e97]: Match controls
+    - generic [ref=e98]:
+      - generic [ref=e99]:
+        - generic [ref=e103]: Pass
+        - generic [ref=e104]: F
+        - generic [ref=e105]: Space
+      - generic [ref=e106]:
+        - generic [ref=e109]: Shoot
+        - generic [ref=e110]: G
+        - generic [ref=e111]: Enter
+      - generic [ref=e112]:
+        - generic [ref=e116]: Sprint
+        - generic [ref=e117]: Shift
+      - generic [ref=e118]:
+        - generic [ref=e123]: Through
+        - generic [ref=e124]: R
+      - generic [ref=e125]:
+        - generic [ref=e130]: Finesse
+        - generic [ref=e131]: Q
+      - generic [ref=e132]:
+        - generic [ref=e135]: Tackle
+        - generic [ref=e136]: T

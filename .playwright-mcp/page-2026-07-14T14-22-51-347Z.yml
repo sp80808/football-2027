@@ -1,0 +1,7 @@
+- generic [ref=e15]:
+  - heading "FOOTBALL 2027" [level=1] [ref=e17]
+  - generic [ref=e19]:
+    - button [ref=e21] [cursor=pointer]
+    - button [ref=e27] [cursor=pointer]
+    - button [ref=e37] [cursor=pointer]
+  - generic [ref=e43]: v0.1.0 Alpha Build

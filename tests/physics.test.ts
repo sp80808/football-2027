@@ -31,6 +31,7 @@ function makeFrame(overrides: Partial<ControllerFrame> = {}): ControllerFrame {
     slidePressed: false,
     switchPressed: false,
     keeperRushHeld: false,
+    teammatePressHeld: false,
     ...overrides,
   };
 }

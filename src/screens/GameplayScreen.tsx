@@ -3,7 +3,6 @@ import { Play, Pause, SkipBack, SkipForward, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '../components/ui/Button';
 import { GameEngine } from '../engine/GameEngine';
-import { SimulationWorkerClient } from '../bridge/SimulationWorkerClient';
 import { HUD } from '../components/HUD';
 import { TouchControls } from '../components/TouchControls';
 import { MatchPhaseOverlay } from '../components/MatchPhaseOverlay';
@@ -24,8 +23,6 @@ const RenderingPanel = React.lazy(() =>
 
 const tsEngine = new GameEngine();
 tsEngine.init();
-const wasmClient = new SimulationWorkerClient();
-wasmClient.init();
 
 interface GameplayScreenProps {
   mode?: 'quickMatch' | 'career';
@@ -35,7 +32,6 @@ interface GameplayScreenProps {
 export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMatch', onExit }) => {
   const phase = useGameStore((s) => s.phase);
   const isMatchEnd = phase === 'full_time';
-  const [useWasm, setUseWasm] = useState(false);
   const [replayMode, setReplayMode] = useState(false);
   const replayModeRef = useRef(false);
   const [replaySource, setReplaySource] = useState<'input' | 'state'>('input');
@@ -76,10 +72,14 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
       const controlled = useSquadStore.getState().getControlled();
       if (!controlled) return;
       const b = bindingsForProfile(controlled);
-      for(let p of tsEngine.homeTeam) p.speedMul = b.speedMul;
-      for(let p of tsEngine.homeTeam) p.accelMul = b.accelMul;
-      for(let p of tsEngine.homeTeam) p.controlMul = b.controlMul;
-      for(let p of tsEngine.homeTeam) p.kickPowerMul = b.kickPowerMul;
+      for (const p of tsEngine.homeTeam) {
+        p.speedMul = b.speedMul;
+        p.accelMul = b.accelMul;
+        p.controlMul = b.controlMul;
+        p.kickPowerMul = b.kickPowerMul;
+        p.turnMul = b.turnMul;
+        p.decelMul = b.decelMul;
+      }
     };
     apply();
     return useSquadStore.subscribe(apply);
@@ -126,10 +126,9 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
           const tracker = useSquadStore.getState().tracker;
           const playerHasBall = tsEngine.homeTeam[tsEngine.activeHomeIndex].controlState === 'under_control' || tsEngine.homeTeam[tsEngine.activeHomeIndex].controlState === 'shielding';
           tracker.observeTick(snapshot.matchTime, playerHasBall);
-          // Player-switch (Tab / LB) cycles which squad member is controlled.
-          if (tsEngine.input.currentFrame.switchPressed) {
-            useSquadStore.getState().switchControl();
-          }
+          // Note: on-pitch player-switching is handled inside the engine (ball-nearest).
+          // We deliberately do NOT cycle the squad store here — doing so desyncs the
+          // RPG "controlled player" (used for XP/binding) from the on-pitch active player.
         }
 
         const frameEvents = tsEngine.drainEvents();
@@ -180,7 +179,6 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
         }
         useGameStore.getState().prunePlayEvents();
       }
-      wasmClient.submitInput(tsEngine.input.currentFrame);
     };
     requestId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(requestId);
@@ -271,9 +269,7 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
         }
       >
         <RenderingPanel
-          useWasm={useWasm}
           engine={tsEngine}
-          wasmClient={wasmClient}
           replayState={replayState}
           showOffsideLine={showOffsideLine}
         />
@@ -372,8 +368,6 @@ export const GameplayScreen: React.FC<GameplayScreenProps> = ({ mode = 'quickMat
 
       <HUD
         engine={tsEngine}
-        useWasm={useWasm}
-        onToggleWasm={() => setUseWasm((value) => !value)}
         showOffsideLine={showOffsideLine}
         onToggleOffsideLine={() => setShowOffsideLine((value) => !value)}
       />

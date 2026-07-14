@@ -26,6 +26,7 @@ export class InputSystem {
     slidePressed: false,
     switchPressed: false,
     keeperRushHeld: false,
+    teammatePressHeld: false,
   };
 
   private keys: Record<string, boolean> = {};
@@ -83,6 +84,7 @@ export class InputSystem {
     this.currentFrame.slidePressed = input.slidePressed;
     this.currentFrame.switchPressed = input.switchPressed;
     this.currentFrame.keeperRushHeld = input.keeperRushHeld;
+    this.currentFrame.teammatePressHeld = input.teammatePressHeld;
   }
 
   update() {
@@ -241,6 +243,11 @@ export class InputSystem {
     this.currentFrame.slidePressed = slide && !this.prevSlide;
     this.currentFrame.switchPressed = switchPlayer && !this.prevSwitch;
     this.currentFrame.keeperRushHeld = keeperRush;
+    // FC26 secondary press: the same RB/R1 (or Q) input used for finesse when in
+    // possession becomes a teammate-press command when out of possession. The
+    // engine decides which meaning applies based on whether the active player has
+    // the ball, so we forward the raw hold here.
+    this.currentFrame.teammatePressHeld = finesse;
 
     this.prevPass = pass;
     this.prevThroughPass = throughPass;

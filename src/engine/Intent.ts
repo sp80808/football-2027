@@ -25,6 +25,12 @@ import { Vec2 } from './Math';
  * - Ball roll:         C + no direction   | C tap
  * - Step-over fake:    C + direction      | C + stick
  *
+ * DEFENDING (FC26 "second man press" parity)
+ * - Teammate press:    hold Q while NOT in possession | hold RB/R1 (pad)
+ *   Directs the nearest AI teammate to press & tackle the ball carrier while
+ *   you keep controlling a different player. (When you HAVE the ball, Q/RB is
+ *   the finesse shot modifier instead.)
+ *
  * CAMERA (settings menu — FC tele/broadcast / pro cam analogue)
  * - Broadcast, Action, Steady, Dynamic
  */
@@ -53,6 +59,8 @@ export interface ControllerFrame {
   slidePressed: boolean;
   switchPressed: boolean;
   keeperRushHeld: boolean;
+  /** FC26 secondary press: hold to send a CPU teammate to pressure the ball. */
+  teammatePressHeld: boolean;
 }
 
 export function createEmptyFrame(): ControllerFrame {
@@ -80,6 +88,7 @@ export function createEmptyFrame(): ControllerFrame {
     slidePressed: false,
     switchPressed: false,
     keeperRushHeld: false,
+    teammatePressHeld: false,
   };
 }
 

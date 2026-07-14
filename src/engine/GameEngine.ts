@@ -317,8 +317,8 @@ export class GameEngine {
       this.activeHomeIndex = bestIdx;
     }
 
-    this.homeLogic.update(this.dt, this.homeTeam, this.homeFrames, this.ball, this.activeHomeIndex);
-    this.awayLogic.update(this.dt, this.awayTeam, this.awayFrames, this.ball, null);
+    this.homeLogic.update(this.dt, this.homeTeam, this.homeFrames, this.ball, this.activeHomeIndex, this.awayTeam, humanInput.teammatePressHeld);
+    this.awayLogic.update(this.dt, this.awayTeam, this.awayFrames, this.ball, null, this.homeTeam);
 
     // Inject human input into active player
     this.homeFrames[this.activeHomeIndex] = humanInput;
@@ -359,19 +359,51 @@ export class GameEngine {
 
     // Update outfields
     for(let i=0; i<10; i++) {
-        let targetPos: Vec2 | undefined = undefined;
+        let homeTarget: Vec2 | undefined = undefined;
+        let awayTarget: Vec2 | undefined = undefined;
+
         if (i === this.activeHomeIndex) {
+          // Human-controlled player: aim shots at goal, passes at the selected mate.
           if (activePlayer.chargeType === 'shoot') {
-             targetPos = TargetFinder.getShotTarget(activePlayer.pos, humanInput.leftStick, true);
+             homeTarget = TargetFinder.getShotTarget(activePlayer.pos, humanInput.leftStick, true);
           } else if (this.passTargetId !== null) {
              const targetMate = this.homeTeam.find(m => m.id === this.passTargetId);
-             if (targetMate) targetPos = targetMate.pos;
+             if (targetMate) homeTarget = targetMate.pos;
+          }
+        } else {
+          // AI home player: if charging a pass, resolve a target from its aim direction
+          // so the kick is aimed at a teammate rather than aimlessly forward.
+          const hp = this.homeTeam[i];
+          if (hp.isCharging && hp.chargeType === 'pass') {
+            const mateId = TargetFinder.findPassTarget(hp.id, hp.pos, this.homeFrames[i].leftStick, this.homeTeam);
+            if (mateId !== null) {
+              const mate = this.homeTeam.find(m => m.id === mateId);
+              if (mate) homeTarget = mate.pos;
+            } else {
+              homeTarget = TargetFinder.getShotTarget(hp.pos, this.homeFrames[i].leftStick, true);
+            }
+          } else if (hp.isCharging && hp.chargeType === 'shoot') {
+            homeTarget = TargetFinder.getShotTarget(hp.pos, this.homeFrames[i].leftStick, true);
           }
         }
-        
-        this.homeTeam[i].update(this.dt, this.homeFrames[i], this.ball, undefined, targetPos);
-        this.awayTeam[i].update(this.dt, this.awayFrames[i], this.ball, undefined);
-        
+
+        // AI away player: same target resolution on the away team (attacks -Y).
+        const ap = this.awayTeam[i];
+        if (ap.isCharging && ap.chargeType === 'pass') {
+          const mateId = TargetFinder.findPassTarget(ap.id, ap.pos, this.awayFrames[i].leftStick, this.awayTeam);
+          if (mateId !== null) {
+            const mate = this.awayTeam.find(m => m.id === mateId);
+            if (mate) awayTarget = mate.pos;
+          } else {
+            awayTarget = TargetFinder.getShotTarget(ap.pos, this.awayFrames[i].leftStick, false);
+          }
+        } else if (ap.isCharging && ap.chargeType === 'shoot') {
+          awayTarget = TargetFinder.getShotTarget(ap.pos, this.awayFrames[i].leftStick, false);
+        }
+
+        this.homeTeam[i].update(this.dt, this.homeFrames[i], this.ball, undefined, homeTarget);
+        this.awayTeam[i].update(this.dt, this.awayFrames[i], this.ball, undefined, awayTarget);
+
         if (this.homeTeam[i].tackleWonThisTick) {
           this.pendingEvents.push({ type: 'tackle', side: 'player' });
         }

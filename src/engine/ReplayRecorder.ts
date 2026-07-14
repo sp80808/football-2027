@@ -45,6 +45,7 @@ export function createEmptyControllerFrame(): ControllerFrame {
     slidePressed: false,
     switchPressed: false,
     keeperRushHeld: false,
+    teammatePressHeld: false,
   };
 }
 

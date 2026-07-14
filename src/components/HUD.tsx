@@ -1,21 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Zap,
-  ArrowUp,
-  ChevronsUp,
   Shield,
-  Crosshair,
-  Footprints,
-  GitBranch,
-  RefreshCw,
   Activity,
-  Cpu,
   Volume2,
   VolumeX,
   Settings,
-  Wind,
   Target,
-  Sparkles,
   Clock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -26,33 +16,13 @@ import { useSettingsStore } from '../store/settingsStore';
 import { modifierLabel } from '../engine/PlayerIntentParser';
 import type { PassModifier, ShotModifier } from '../engine/Intent';
 import { formatBroadcastClock, getPeriodLabel } from '../utils/matchTime';
+import { CONTROL_BINDINGS } from '../input/controlBindings';
+import { ControlBindingsPanel } from './ControlGlyph';
 
 interface HUDProps {
   engine: GameEngine;
-  useWasm?: boolean;
-  onToggleWasm?: () => void;
   showOffsideLine?: boolean;
   onToggleOffsideLine?: () => void;
-}
-
-function Key({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd className="inline-flex min-w-[22px] items-center justify-center rounded border border-white/30 bg-white/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-white">
-      {children}
-    </kbd>
-  );
-}
-
-function ControlRow({ label, keys, icon }: { label: string; keys: React.ReactNode[]; icon: React.ReactNode }) {
-  return (
-    <li className="flex items-center gap-2">
-      <span className="shrink-0 text-white/50">{icon}</span>
-      <span className="w-[72px] shrink-0 text-[11px] text-white/70">{label}</span>
-      <span className="flex flex-wrap gap-1">
-        {keys.map((key, index) => <Key key={index}>{key}</Key>)}
-      </span>
-    </li>
-  );
 }
 
 function StatRow({ label, value, accent = 'text-white' }: { label: string; value: string | number; accent?: string }) {
@@ -105,7 +75,7 @@ function PlayEventFeed({ side, align }: { side: 'home' | 'away'; align: 'left' |
   );
 }
 
-export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = false, onToggleOffsideLine }: HUDProps) {
+export function HUD({ engine, showOffsideLine = false, onToggleOffsideLine }: HUDProps) {
   const { audioEnabled, toggleAudio, homeScore, awayScore, elapsedSeconds, phase, announcement, half } = useGameStore();
   const { showControlHints, setSettingsOpen, activeModifierLabel, flashModifierLabel } = useSettingsStore();
   const [diagnostics, setDiagnostics] = useState({
@@ -228,27 +198,13 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
   return (
     <>
       {showControlHints && (
-      <div className="pointer-events-none absolute bottom-28 left-3 sm:bottom-32 sm:left-4 select-none">
-        <div className="min-w-[220px] rounded-xl border border-white/10 bg-black/60 p-3 backdrop-blur-sm">
-          <p className="mb-2 px-0.5 text-[10px] font-semibold uppercase tracking-widest text-white/40">Controls</p>
-          <ul className="space-y-1.5">
-            <ControlRow label="Move" icon={<ArrowUp size={12} />} keys={['W', 'A', 'S', 'D']} />
-            <ControlRow label="Sprint" icon={<ChevronsUp size={12} />} keys={['Shift']} />
-            <ControlRow label="Shield" icon={<Shield size={12} />} keys={['Ctrl']} />
-            <div className="my-1 border-t border-white/10" />
-            <ControlRow label="Pass" icon={<Footprints size={12} />} keys={['F', 'Space']} />
-            <ControlRow label="Shoot" icon={<Crosshair size={12} />} keys={['G', 'Enter']} />
-            <ControlRow label="Through" icon={<GitBranch size={12} />} keys={['R']} />
-            <ControlRow label="Lob" icon={<Wind size={12} />} keys={['E']} />
-            <ControlRow label="Finesse" icon={<Target size={12} />} keys={['Q']} />
-            <ControlRow label="Chip" icon={<Sparkles size={12} />} keys={['Alt']} />
-            <ControlRow label="Skill" icon={<Sparkles size={12} />} keys={['C']} />
-            <ControlRow label="Tackle" icon={<Zap size={12} />} keys={['T']} />
-            <ControlRow label="Slide" icon={<Zap size={12} />} keys={['X', 'Shift+T']} />
-          </ul>
-          <p className="mt-2 text-[10px] leading-tight text-white/30">Hold to charge. Tap shoot twice for low driven.</p>
+        <div className="pointer-events-none absolute bottom-28 left-3 sm:bottom-32 sm:left-4 select-none">
+          <ControlBindingsPanel
+            bindings={CONTROL_BINDINGS.filter((b) => ['move', 'sprint', 'shield', 'pass', 'shoot', 'through', 'lob', 'finesse', 'chip', 'skill', 'tackle', 'slide', 'switch', 'press'].includes(b.id))}
+            title="Controls"
+            compact
+          />
         </div>
-      </div>
       )}
 
       <PlayEventFeed side="home" align="left" />
@@ -347,16 +303,6 @@ export function HUD({ engine, useWasm = false, onToggleWasm, showOffsideLine = f
       </div>
 
       <div className="pointer-events-auto absolute right-3 top-[9.5rem] z-10 flex flex-col gap-2 select-none sm:right-4 sm:top-[10rem]">
-        {onToggleWasm && (
-          <button
-            onClick={onToggleWasm}
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/60 px-3 py-1.5 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/10"
-          >
-            <Cpu size={12} />
-            <span>Sim: <span className={useWasm ? 'text-amber-300' : 'text-blue-300'}>{useWasm ? 'WASM' : 'TypeScript'}</span></span>
-            <RefreshCw size={11} className="text-white/40" />
-          </button>
-        )}
         <button
           onClick={() => setSettingsOpen(true)}
           className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/60 px-3 py-1.5 text-[11px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/10"

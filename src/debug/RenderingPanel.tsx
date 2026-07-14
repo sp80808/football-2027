@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RendererFactory } from '../rendering/RendererFactory';
 import { WorldState } from '../engine/WorldState';
-import { SimulationWorkerClient } from '../bridge/SimulationWorkerClient';
 import { GameEngine } from '../engine/GameEngine';
 import { addStadiumToScene } from '../scene/createStadium';
 import { SimulationConfig } from '../engine/SimulationConfig';
@@ -13,9 +12,7 @@ import { useSettingsStore } from '../store/settingsStore';
 import { audioManager } from '../audio/AudioManager';
 
 interface RenderingPanelProps {
-  useWasm: boolean;
   engine: GameEngine;
-  wasmClient: SimulationWorkerClient;
   replayState?: WorldState | null;
   showOffsideLine?: boolean;
 }
@@ -398,9 +395,7 @@ function animateRunner(model: PlayerModel, speed: number, time: number) {
 }
 
 export function RenderingPanel({
-  useWasm,
   engine,
-  wasmClient,
   replayState = null,
   showOffsideLine = false,
 }: RenderingPanelProps) {
@@ -578,7 +573,7 @@ export function RenderingPanel({
         const dt = Math.min((now - lastFrameTime) / 1000, 0.05);
         lastFrameTime = now;
 
-        const state = replayStateRef.current ?? (useWasm ? wasmClient.getRenderState() : engine.getRenderState());
+        const state = replayStateRef.current ?? engine.getRenderState();
 
         elapsed += dt;
 
@@ -745,7 +740,7 @@ export function RenderingPanel({
       crowd?.dispose();
       renderer?.dispose?.();
     };
-  }, [useWasm, engine, wasmClient]);
+  }, [engine]);
 
   return (
     <div className="relative h-full w-full">

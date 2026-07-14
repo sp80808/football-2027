@@ -10,7 +10,9 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "server": "tsx server/colyseusServer.ts",
+    "server:dev": "tsx --watch server/colyseusServer.ts"
   },
   "dependencies": {
     "@colyseus/schema": "^4.0.27",
@@ -20,6 +22,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "colyseus": "^0.17.10",
+    "colyseus.js": "^0.16.22",
     "dotenv": "^17.2.3",
     "edge-tts-universal": "^1.4.0",
     "express": "^4.21.2",

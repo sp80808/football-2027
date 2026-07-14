@@ -1,0 +1,99 @@
+- generic [ref=f3e139]:
+  - generic [ref=f3e140]:
+    - generic "Football simulation viewport" [ref=f3e141]
+    - generic: WebGPURenderer
+    - generic: Power
+  - button [ref=f3e145] [cursor=pointer]
+  - button [ref=f3e151] [cursor=pointer]
+  - generic:
+    - generic:
+      - generic:
+        - paragraph: Controls
+        - generic: Keyboard
+      - list:
+        - listitem:
+          - generic: Move
+          - generic:
+            - generic: W
+            - generic: A
+            - generic: S
+            - generic: D
+        - listitem:
+          - generic: Sprint
+          - generic: Shift
+        - listitem:
+          - generic: Shield
+          - generic: Ctrl
+        - listitem:
+          - generic: Pass
+          - generic:
+            - generic: F
+            - generic: Space
+        - listitem:
+          - generic: Shoot
+          - generic:
+            - generic: G
+            - generic: Enter
+        - listitem:
+          - generic: Through
+          - generic: R
+        - listitem:
+          - generic: Lob
+          - generic: E
+        - listitem:
+          - generic: Finesse
+          - generic: Q
+        - listitem:
+          - generic: Chip
+          - generic: Alt
+        - listitem:
+          - generic: Skill
+          - generic: C
+        - listitem:
+          - generic: Tackle
+          - generic: T
+        - listitem:
+          - generic: Slide
+          - generic:
+            - generic: X
+            - generic: Shift+T
+        - listitem:
+          - generic: Switch
+          - generic: Tab
+        - listitem:
+          - generic: 2nd Press
+          - generic: Q hold
+      - paragraph: Hold to charge. Tap shoot twice for low driven.
+  - generic:
+    - generic:
+      - generic:
+        - generic: "0"
+        - generic: "|"
+        - generic:
+          - generic: 0:00
+          - generic: 1ST HALF
+        - generic: "|"
+        - generic: "0"
+  - generic:
+    - generic:
+      - generic:
+        - generic: P1
+        - generic: Player
+  - generic:
+    - generic:
+      - paragraph: Diagnostics
+      - generic:
+        - generic: FPS
+        - generic: "80"
+        - generic: TPS
+        - generic: "93"
+        - generic: Player
+        - generic: 0.0 m/s
+        - generic: Ball
+        - generic: 0.0 m/s
+      - generic: free
+      - generic: GK — positioning
+  - generic [ref=f3e157]:
+    - button "Settings" [ref=f3e158]
+    - button "Sound On" [ref=f3e163]
+    - button "Offside Line" [ref=f3e169]

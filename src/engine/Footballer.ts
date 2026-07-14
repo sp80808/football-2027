@@ -48,6 +48,8 @@ export class Footballer {
   accelMul = 1;
   controlMul = 1;
   kickPowerMul = 1;
+  turnMul = 1;
+  decelMul = 1;
   
   // Enhanced locomotion properties
   private angularVelocity = 0; // radians per second
@@ -108,6 +110,13 @@ export class Footballer {
       playerPos: this.pos,
     });
 
+    // While containing, face the opponent directly. Applied before locomotion
+    // so the single updateLocomotion call incorporates the containment facing.
+    if (intent.isContaining && opponent) {
+      this.scratchToPlayer.set(opponent.pos.x - this.pos.x, opponent.pos.y - this.pos.y);
+      if (this.scratchToPlayer.magSq() > 0.01) intent.faceDir.copy(this.scratchToPlayer.normalize());
+    }
+
     if (this.defensiveState !== 'none') {
       this.tackleWonThisTick = this.updateDefensive(dt, ball, opponent);
     } else {
@@ -121,9 +130,6 @@ export class Footballer {
 
     if (this.skillBurstTimer > 0) this.skillBurstTimer -= dt;
     this.applySkillMove(dt, intent.skillMove, ball);
-    if (intent.isContaining && opponent) { this.scratchToPlayer.set(opponent.pos.x-this.pos.x,opponent.pos.y-this.pos.y); if (this.scratchToPlayer.magSq()>0.01) intent.faceDir.copy(this.scratchToPlayer.normalize()); }
-    this.updateLocomotion(dt, intent);
-    this.updateBallInteraction(dt, input, intent, ball, opponent);
   }
 
   private detectBallReceiving(ball: Ball): boolean {
@@ -233,7 +239,7 @@ export class Footballer {
     if (moveDirection.magSq() < 0.01) {
       const speed = this.vel.mag();
       if (speed > 0) {
-        const drop = Math.min(speed, cfg.PLAYER_DECEL * dt);
+        const drop = Math.min(speed, cfg.PLAYER_DECEL * this.decelMul * dt);
         this.vel.normalize().mul(speed - drop);
       }
     } else {
@@ -243,7 +249,7 @@ export class Footballer {
       const speedRatio = Math.min(this.vel.mag() / cfg.PLAYER_SPRINT_SPEED, 1);
       const turnSpeed = cfg.PLAYER_TURN_SPEED_WALK
         + (cfg.PLAYER_TURN_SPEED_SPRINT - cfg.PLAYER_TURN_SPEED_WALK) * speedRatio;
-      const effectiveTurnSpeed = intent.isShielding ? turnSpeed*0.5 : intent.isContaining ? turnSpeed*cfg.CONTAIN_TURN_MULT : turnSpeed;
+      const effectiveTurnSpeed = (intent.isShielding ? turnSpeed*0.5 : intent.isContaining ? turnSpeed*cfg.CONTAIN_TURN_MULT : turnSpeed) * this.turnMul;
       const targetFacing = intent.faceDir.clone();
       this.facing.x += (targetFacing.x - this.facing.x) * effectiveTurnSpeed * dt;
       this.facing.y += (targetFacing.y - this.facing.y) * effectiveTurnSpeed * dt;
