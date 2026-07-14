@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="400" viewBox="0 0 1600 400" role="img" aria-labelledby="title desc">
+<title id="title">Football 2027 logo</title><desc id="desc">F27 monogram and Football 2027 wordmark.</desc>
+<defs><linearGradient id="g" x1="20" y1="0" x2="560" y2="400" gradientUnits="userSpaceOnUse"><stop stop-color="#75A7FF"/><stop offset=".5" stop-color="#2F7BFF"/><stop offset="1" stop-color="#22D49B"/></linearGradient></defs>
+<rect width="1600" height="400" rx="42" fill="#05080D"/>
+<g transform="translate(56 44) scale(.61)">
+<path d="M112 118H326L298 174H184V230H276L248 286H184V398H112V118Z" fill="url(#g)"/>
+<path d="M286 214H400V270L338 334H400V398H270V346L334 278H286V214Z" fill="url(#g)"/>
+<circle cx="256" cy="256" r="40" fill="none" stroke="#F5F8FC" stroke-opacity=".16" stroke-width="3"/>
+</g>
+<text x="410" y="206" fill="#F5F8FC" font-family="Inter,Arial,sans-serif" font-size="112" font-weight="900" letter-spacing="-7">FOOTBALL</text>
+<text x="417" y="294" fill="url(#g)" font-family="Inter,Arial,sans-serif" font-size="80" font-weight="900" letter-spacing="12">2027</text>
+<text x="1020" y="292" fill="#91A2B7" font-family="Inter,Arial,sans-serif" font-size="25" font-weight="700" letter-spacing="8">BUILD YOUR FOOTBALL STORY</text>
+</svg>
