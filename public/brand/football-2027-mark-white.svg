@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Football 2027 monochrome mark</title>
+  <desc id="desc">A one-colour angular F crossed by a rising diagonal with a centre-circle cutout.</desc>
+  <defs>
+    <mask id="centre-cutout">
+      <rect width="256" height="256" fill="white"/>
+      <circle cx="151" cy="112" r="14" fill="black"/>
+    </mask>
+  </defs>
+  <g fill="#F2F7FF" mask="url(#centre-cutout)">
+    <path d="M28 28h162l-20 40H84v38h72l-19 38H84v84H28z"/>
+    <path d="M145 228 228 28h-49L96 228z"/>
+  </g>
+</svg>

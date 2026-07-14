@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 256" role="img" aria-labelledby="title desc">
+  <title id="title">Football 2027 horizontal logo</title>
+  <desc id="desc">The Forward Pitch symbol beside the Football 2027 wordmark and tagline.</desc>
+  <g>
+    <path fill="#14D1E6" d="M28 28h162l-20 40H84v38h72l-19 38H84v84H28z"/>
+    <path fill="#33D677" d="M145 228 228 28h-49L96 228z"/>
+    <circle cx="151" cy="112" r="14" fill="#07101C" stroke="#F2F7FF" stroke-width="5"/>
+  </g>
+  <g font-family="Inter, Arial, sans-serif">
+    <text x="286" y="118" fill="#F2F7FF" font-size="86" font-weight="900" letter-spacing="-4">FOOTBALL</text>
+    <text x="286" y="202" fill="#14D1E6" font-size="86" font-weight="900" letter-spacing="-4">2027</text>
+    <text x="530" y="193" fill="#95A4B8" font-size="15" font-weight="700" letter-spacing="2.5">THE NEXT MATCH STARTS HERE.</text>
+  </g>
+</svg>
