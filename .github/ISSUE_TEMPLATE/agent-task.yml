@@ -65,8 +65,8 @@ body:
       label: Automation permission
       description: Explicit permission is required before the triage workflow applies agent:ready.
       options:
-        - Agent execution: human approval still required
-        - Agent execution: allowed
+        - "Agent execution: human approval still required"
+        - "Agent execution: allowed"
     validations:
       required: true
 
