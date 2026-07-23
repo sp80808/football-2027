@@ -1,0 +1,109 @@
+name: Safe issue and PR triage
+
+on:
+  issues:
+    types: [opened, reopened]
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  triage:
+    name: Apply non-destructive metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ensure labels and classify work
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const definitions = [
+              { name: 'needs-triage', color: 'FBCA04', description: 'Needs human prioritisation or clarification' },
+              { name: 'agent:ready', color: '0E8A16', description: 'Explicitly approved for bounded agent execution' },
+              { name: 'agent:human-review', color: 'D93F0B', description: 'Agent work that must be reviewed by a human' },
+              { name: 'area:mobile', color: '1D76DB', description: 'Mobile, touch, PWA, controller or iOS work' },
+              { name: 'area:devops', color: '5319E7', description: 'CI, build, release, dependency or automation work' },
+              { name: 'type:bug', color: 'B60205', description: 'Defect or regression' },
+              { name: 'type:research', color: 'C5DEF5', description: 'Research, audit or documentation work' }
+            ];
+
+            for (const label of definitions) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name: label.name });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                await github.rest.issues.createLabel({ owner, repo, ...label });
+              }
+            }
+
+            if (context.eventName === 'issues') {
+              const issue = context.payload.issue;
+              const title = issue.title || '';
+              const body = issue.body || '';
+              const text = `${title}\n${body}`.toLowerCase();
+              const labels = new Set(['needs-triage']);
+
+              if (/mobile|touch|iphone|ios|gamepad|controller|pwa|capacitor|safe-area/.test(text)) {
+                labels.add('area:mobile');
+              }
+              if (/ci\b|devops|build|workflow|playwright|vitest|dependabot|release|artifact|automation/.test(text)) {
+                labels.add('area:devops');
+              }
+              if (/\bbug\b|crash|regression|broken|failure|fails|error/.test(text)) {
+                labels.add('type:bug');
+              }
+              if (/research|audit|investigate|documentation|benchmark|spike/.test(text)) {
+                labels.add('type:research');
+              }
+
+              const explicitlyAgentReady =
+                title.trim().toLowerCase().startsWith('[agent]') ||
+                body.toLowerCase().includes('agent execution: allowed');
+
+              if (explicitlyAgentReady) {
+                labels.add('agent:ready');
+                labels.add('agent:human-review');
+              }
+
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: issue.number,
+                labels: [...labels]
+              });
+            }
+
+            if (context.eventName === 'pull_request_target') {
+              const pull = context.payload.pull_request;
+              const branch = pull.head.ref || '';
+              const body = pull.body || '';
+              const actor = pull.user?.login || '';
+              const looksAgentAuthored =
+                /(^|\/)(agent|linear|codex)[\/-]/i.test(branch) ||
+                /haw-\d+/i.test(branch) ||
+                /\bHAW-\d+\b/i.test(body) ||
+                /\b(agent|bot)\b/i.test(actor);
+
+              if (looksAgentAuthored) {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: pull.number,
+                  labels: ['agent:human-review']
+                });
+              }
+            }
+
+            core.summary
+              .addHeading('Safe triage complete')
+              .addRaw('Labels were created or applied only. No issue, pull request, branch or release was closed, merged or modified.')
+              .write();
