@@ -592,26 +592,27 @@ export class MidfielderAI extends BaseAIController {
     const step = 5;
     let bestPos: Vec2 | null = null;
     let bestScore = -1;
+    const scratchVec = new Vec2();
 
     for (let x = -5; x <= 5; x += step) {
       for (let y = -5; y <= 5; y += step) {
-        const testPos = self.pos.clone().add(new Vec2(x, y));
+        scratchVec.set(self.pos.x + x, self.pos.y + y);
         let score = 100;
 
         // Penalize distance from ideal position
-        score -= testPos.distanceTo(self.pos) * 2;
+        score -= scratchVec.distanceTo(self.pos) * 2;
 
         // Reward space from opponents
         for (const opp of context.opponents) {
-          score += testPos.distanceTo(opp.pos) * 3;
+          score += scratchVec.distanceTo(opp.pos) * 3;
         }
 
         // Reward forward position
-        if (testPos.y > self.pos.y) score += 10;
+        if (scratchVec.y > self.pos.y) score += 10;
 
         if (score > bestScore) {
           bestScore = score;
-          bestPos = testPos;
+          bestPos = scratchVec.clone();
         }
       }
     }
