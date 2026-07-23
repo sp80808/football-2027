@@ -264,19 +264,32 @@ export class GoalkeeperAI extends BaseAIController {
   }
 
   private isPassingLaneOpen(context: AIContext, targetIndex: number): boolean {
-    const from = new Vec2(context.self.pos.x, context.self.pos.y);
+    const fromX = context.self.pos.x;
+    const fromY = context.self.pos.y;
     const to = context.teammates[targetIndex].pos;
-    const dir = to.clone().sub(from).normalize();
-    const dist = from.distanceTo(to);
 
-    for (const opp of context.opponents) {
-      const oppPos = new Vec2(opp.pos.x, opp.pos.y);
-      const toOpp = oppPos.clone().sub(from);
-      const proj = toOpp.dot(dir);
-      if (proj > 0 && proj < dist) {
-        const perp = toOpp.clone().sub(dir.mul(proj));
-        if (perp.mag() < 2) return false;
-      }
+    let dirX = to.x - fromX;
+    let dirY = to.y - fromY;
+    const dist = Math.sqrt(dirX * dirX + dirY * dirY);
+
+    if (dist > 0) {
+        dirX /= dist;
+        dirY /= dist;
+    }
+
+    for (let i = 0; i < context.opponents.length; i++) {
+        const oppPos = context.opponents[i].pos;
+        const toOppX = oppPos.x - fromX;
+        const toOppY = oppPos.y - fromY;
+
+        const proj = toOppX * dirX + toOppY * dirY;
+
+        if (proj > 0 && proj < dist) {
+            const perpX = toOppX - dirX * proj;
+            const perpY = toOppY - dirY * proj;
+
+            if (perpX * perpX + perpY * perpY < 4) return false;
+        }
     }
     return true;
   }
@@ -525,19 +538,32 @@ export class MidfielderAI extends BaseAIController {
 
   private isPassingLaneOpen(context: AIContext, targetIndex: number): boolean {
     // Simplified - check if any opponent is in the passing lane
-    const from = context.self.pos;
+    const fromX = context.self.pos.x;
+    const fromY = context.self.pos.y;
     const to = context.teammates[targetIndex].pos;
-    const dir = to.clone().sub(from).normalize();
-    const dist = from.distanceTo(to);
 
-    for (const opp of context.opponents) {
-      const oppPos = opp.pos;
-      const toOpp = oppPos.clone().sub(from);
-      const proj = toOpp.dot(dir);
-      if (proj > 0 && proj < dist) {
-        const perp = toOpp.clone().sub(dir.mul(proj));
-        if (perp.mag() < 3) return false;
-      }
+    let dirX = to.x - fromX;
+    let dirY = to.y - fromY;
+    const dist = Math.sqrt(dirX * dirX + dirY * dirY);
+
+    if (dist > 0) {
+        dirX /= dist;
+        dirY /= dist;
+    }
+
+    for (let i = 0; i < context.opponents.length; i++) {
+        const oppPos = context.opponents[i].pos;
+        const toOppX = oppPos.x - fromX;
+        const toOppY = oppPos.y - fromY;
+
+        const proj = toOppX * dirX + toOppY * dirY;
+
+        if (proj > 0 && proj < dist) {
+            const perpX = toOppX - dirX * proj;
+            const perpY = toOppY - dirY * proj;
+
+            if (perpX * perpX + perpY * perpY < 9) return false;
+        }
     }
     return true;
   }
@@ -755,18 +781,32 @@ export class AttackerAI extends BaseAIController {
   }
 
   private isPassingLaneOpen(context: AIContext, targetIndex: number): boolean {
-    const from = context.self.pos;
+    const fromX = context.self.pos.x;
+    const fromY = context.self.pos.y;
     const to = context.teammates[targetIndex].pos;
-    const dir = to.clone().sub(from).normalize();
-    const dist = from.distanceTo(to);
 
-    for (const opp of context.opponents) {
-      const toOpp = opp.pos.clone().sub(from);
-      const proj = toOpp.dot(dir);
-      if (proj > 0 && proj < dist) {
-        const perp = toOpp.clone().sub(dir.mul(proj));
-        if (perp.mag() < 3) return false;
-      }
+    let dirX = to.x - fromX;
+    let dirY = to.y - fromY;
+    const dist = Math.sqrt(dirX * dirX + dirY * dirY);
+
+    if (dist > 0) {
+        dirX /= dist;
+        dirY /= dist;
+    }
+
+    for (let i = 0; i < context.opponents.length; i++) {
+        const oppPos = context.opponents[i].pos;
+        const toOppX = oppPos.x - fromX;
+        const toOppY = oppPos.y - fromY;
+
+        const proj = toOppX * dirX + toOppY * dirY;
+
+        if (proj > 0 && proj < dist) {
+            const perpX = toOppX - dirX * proj;
+            const perpY = toOppY - dirY * proj;
+
+            if (perpX * perpX + perpY * perpY < 9) return false;
+        }
     }
     return true;
   }
