@@ -1,6 +1,15 @@
+## Traceability
+
+- GitHub issue:
+- Linear issue (when applicable):
+- Agent execution: allowed / not applicable
+- Human merge required: yes
+
+> Use `Relates to #...` for partial work. Use `Closes #...` only when this merge fully satisfies the canonical GitHub issue.
+
 ## Player-facing outcome
 
-<!-- What player-facing loop becomes better? -->
+<!-- What player-facing loop becomes better? For infrastructure-only changes, state the developer/operational outcome. -->
 
 ## Visible result
 
@@ -23,6 +32,7 @@
 - [ ] Visual/browser check completed where applicable
 - [ ] Keyboard/controller/touch boundaries checked where applicable
 - [ ] Save migration or backward compatibility considered
+- [ ] Agent-authored changes retain human review before merge
 
 ## Performance and safety
 
@@ -31,6 +41,7 @@
 - Memory impact:
 - Lower-quality fallback:
 - Disable/rollback path:
+- Workflow permission or supply-chain impact:
 
 ## Arcade gate
 
