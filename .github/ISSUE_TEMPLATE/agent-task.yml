@@ -1,0 +1,83 @@
+name: Bounded agent task
+description: Define a safe, testable implementation slice for a coding or Linear agent.
+title: "[agent] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GitHub remains the engineering source of truth. Agent work must end in reviewable evidence or a draft pull request; it must not merge, release or close product issues automatically.
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What player, developer or operational result should become true?
+      placeholder: Describe one observable result.
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation boundary
+      description: List the files, systems and exact slice the agent may change.
+      placeholder: Include likely paths and explicitly excluded systems.
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Architecture and safety constraints
+      description: State determinism, offline, performance, security and human-review boundaries.
+      placeholder: e.g. Do not import DOM or Three.js into src/engine; no auto-merge.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Provide a concrete checklist that can be verified by tests or review.
+      placeholder: "- [ ] ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+      description: Name the typecheck, unit, browser, deterministic, visual or device checks required.
+      placeholder: pnpm run lint; pnpm run test; targeted Playwright/device checks.
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and blockers
+      description: Link prerequisite GitHub issues, PRs, Linear issues or documents.
+      placeholder: "Blocked by #...; Linear HAW-..."
+
+  - type: dropdown
+    id: automation_permission
+    attributes:
+      label: Automation permission
+      description: Explicit permission is required before the triage workflow applies agent:ready.
+      options:
+        - "Agent execution: human approval still required"
+        - "Agent execution: allowed"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: human_gates
+    attributes:
+      label: Human gates
+      options:
+        - label: A human must review before merge.
+          required: true
+        - label: The agent must not publish a release or close the canonical GitHub issue.
+          required: true
+        - label: Any CI weakening, major dependency upgrade or gameplay-authority change requires explicit approval.
+          required: true
